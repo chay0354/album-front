@@ -1,0 +1,240 @@
+.page {
+  min-height: 100%;
+  padding: 2rem;
+  max-width: 640px;
+  margin: 0 auto;
+  background: #e8e8e8;
+}
+
+.center {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--surface2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.header {
+  text-align: center;
+  padding: 0 0 1.5rem;
+}
+
+.header h1 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+}
+
+.sub {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.preview {
+  margin-bottom: 2rem;
+}
+
+.coverFrame {
+  aspect-ratio: 3/4;
+  max-height: 380px;
+  margin: 0 auto;
+  border-radius: var(--radius);
+  background: var(--surface2) center/cover no-repeat;
+  position: relative;
+  overflow: hidden;
+}
+
+.coverOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(to top, rgba(0,0,0,0.5) 0%, transparent 50%);
+}
+
+.coverTextDisplay {
+  position: absolute;
+  z-index: 2;
+  cursor: grab;
+  user-select: none;
+  padding: 0.25rem 0.5rem;
+  white-space: nowrap;
+  max-width: 90%;
+  text-align: center;
+}
+
+.coverTextDisplay.dragging {
+  cursor: grabbing;
+}
+
+.coverTextDisplay:active {
+  cursor: grabbing;
+}
+
+.coverTitle {
+  display: block;
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  pointer-events: none;
+}
+
+.sizeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.sizeRow .headerLabel {
+  margin-bottom: 0;
+  min-width: 100px;
+}
+
+.sizeSlider {
+  flex: 1;
+  max-width: 200px;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.sizeValue {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  min-width: 2.5rem;
+}
+
+.dragHint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 1rem;
+}
+
+.headerInputWrap {
+  margin-bottom: 1.25rem;
+}
+
+.headerLabel {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 0.4rem;
+}
+
+.headerInput {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.1rem;
+}
+
+.headerInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.section h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.option {
+  width: 80px;
+  height: 100px;
+  border-radius: 8px;
+  border: 2px solid var(--surface2);
+  background: var(--surface);
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s;
+}
+
+.option img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.option:hover,
+.option.selected {
+  border-color: var(--accent);
+}
+
+.option.upload {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.option.upload:hover {
+  color: var(--accent);
+}
+
+.error {
+  color: #e07070;
+  margin: 1rem 0 0;
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.secondary {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--surface2);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius);
+  font-weight: 500;
+}
+
+.secondary:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.cta {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+.cta:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

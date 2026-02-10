@@ -1,0 +1,74 @@
+.page {
+  min-height: 100%;
+  padding: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card {
+  text-align: center;
+  max-width: 420px;
+  padding: 2.5rem;
+  background: var(--surface);
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2);
+}
+
+.icon {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.25rem;
+  background: var(--success);
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 700;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+}
+
+.sub {
+  color: var(--text-muted);
+  margin: 0 0 1.5rem;
+  font-size: 1rem;
+}
+
+.cta {
+  display: inline-block;
+  background: var(--accent);
+  color: var(--on-accent);
+  padding: 0.9rem 2rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin-bottom: 1.5rem;
+  transition: background 0.2s;
+}
+
+.cta:hover {
+  background: var(--accent-hover);
+  text-decoration: none;
+}
+
+.links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.links a {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.links a:hover {
+  color: var(--accent);
+}
