@@ -72,3 +72,24 @@
 .links a:hover {
   color: var(--accent);
 }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .page {
+    padding: 1rem;
+  }
+  .card {
+    padding: 1.5rem;
+    margin: 0 0.5rem;
+  }
+  .card h1 {
+    font-size: 1.4rem;
+  }
+  .cta {
+    width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

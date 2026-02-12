@@ -114,3 +114,26 @@
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .page {
+    padding: 1rem;
+  }
+  .header h1 {
+    font-size: 1.4rem;
+  }
+  .center {
+    padding: 1.5rem;
+  }
+  .userCard {
+    padding: 1rem;
+  }
+  .userEmail {
+    font-size: 1rem;
+  }
+  .pdfRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

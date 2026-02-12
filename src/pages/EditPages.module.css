@@ -916,3 +916,151 @@
   padding: 2px 4px;
   text-align: center;
 }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .page {
+    padding: 0.75rem;
+  }
+  .spread {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    min-height: 0;
+  }
+  .halfPageWrapper {
+    max-width: 100%;
+    width: 100%;
+  }
+  .halfPage {
+    max-width: 260px;
+    margin: 0 auto;
+  }
+  .spine {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--surface3);
+  }
+  .viewNav {
+    gap: 0.5rem;
+  }
+  .viewLabel {
+    min-width: 80px;
+    font-size: 0.8rem;
+  }
+  .navBtn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .fullScreenOverlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .fullScreenContent {
+    width: 100%;
+    max-width: 100%;
+    height: 95vh;
+    max-height: 95vh;
+    padding: 0.75rem;
+    border-radius: 12px 12px 0 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .fullScreenHeader {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .fullScreenHeader h2 {
+    font-size: 0.95rem;
+    flex: 1 1 100%;
+    order: 1;
+  }
+  .fullScreenActions {
+    width: 100%;
+    justify-content: flex-end;
+    order: 2;
+  }
+  .fullScreenActions .secondary,
+  .fullScreenActions .cta {
+    min-height: 44px;
+    padding: 0.6rem 1rem;
+  }
+  .editorLayout {
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .fullScreenPageWrap {
+    width: 100%;
+    max-width: 100%;
+    flex: 0 0 auto;
+    max-height: 45vh;
+  }
+  .editorControlsCol {
+    width: 100%;
+    max-width: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+    min-height: 0;
+  }
+  .editorControls {
+    width: 100%;
+    max-width: 100%;
+    min-height: 44px;
+  }
+  .addImageToPageBtn {
+    width: 100%;
+    max-width: 100%;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stickerPickerRow {
+    max-width: 100%;
+  }
+  .templatePickerRow {
+    max-width: 100%;
+  }
+  .templatePickerBtn {
+    min-height: 44px;
+  }
+  .slotPhotoPickerGrid {
+    max-width: 100%;
+  }
+  .slotPhotoPickerBtn {
+    min-height: 60px;
+  }
+  .actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .actions .secondary,
+  .actions .cta {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+  }
+  .editPageBtn,
+  .editPageBtnOnPage {
+    min-height: 40px;
+    padding: 0.5rem 0.85rem;
+  }
+  .albumModel {
+    padding: 0.75rem;
+  }
+  .pile {
+    max-height: 160px;
+  }
+  .uploadBtn {
+    min-height: 44px;
+  }
+  .spreadActions .secondary,
+  .spreadActions .cta {
+    min-height: 44px;
+  }
+}

@@ -13,6 +13,25 @@
   --font: "Heebo", sans-serif;
   --shadow: 0 2px 8px rgba(0,0,0,0.08);
   --shadow-strong: 0 4px 16px rgba(0,0,0,0.12);
+  /* Design tokens used by Home etc. */
+  --space-2: 0.25rem;
+  --space-4: 0.5rem;
+  --space-5: 0.75rem;
+  --space-6: 1rem;
+  --space-8: 1.25rem;
+  --space-12: 2rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-3xl: 1.75rem;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --radius-lg: 14px;
+  --error: #c00;
+  --error-soft: rgba(200, 0, 0, 0.08);
+  --accent-soft: rgba(201, 162, 39, 0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 * {
@@ -47,4 +66,21 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+/* Mobile-friendly base */
+@media (max-width: 768px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Touch-friendly: tap highlight */
+button, a, [role="button"] {
+  -webkit-tap-highlight-color: rgba(201, 162, 39, 0.2);
 }
