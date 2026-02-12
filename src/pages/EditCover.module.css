@@ -48,13 +48,22 @@
 }
 
 .coverFrame {
-  aspect-ratio: 3/4;
+  aspect-ratio: 7/5;
   max-height: 380px;
   margin: 0 auto;
   border-radius: var(--radius);
-  background: var(--surface2) center/cover no-repeat;
+  background: var(--surface2);
   position: relative;
   overflow: hidden;
+}
+
+.coverFrameBg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .coverOverlay {
@@ -85,17 +94,46 @@
 
 .coverTitle {
   display: block;
-  color: #fff;
   font-weight: 600;
   text-shadow: 0 1px 3px rgba(0,0,0,0.6);
   pointer-events: none;
+}
+
+.textToolbar {
+  margin-bottom: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.addTextBtn {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.addTextBtn:hover {
+  filter: brightness(1.05);
+}
+
+.dragHint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0;
 }
 
 .sizeRow {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
 }
 
 .sizeRow .headerLabel {
@@ -116,10 +154,104 @@
   min-width: 2.5rem;
 }
 
-.dragHint {
+.textEditorPanel {
+  background: var(--surface);
+  border: 1px solid var(--surface2);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.textEditorTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 1rem;
+}
+
+.textEditorRow {
+  margin-bottom: 1rem;
+}
+
+.textEditorRow:last-of-type {
+  margin-bottom: 0;
+}
+
+.positionRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.positionLabel {
   font-size: 0.85rem;
   color: var(--text-muted);
-  margin: 0 0 1rem;
+  min-width: 1.2rem;
+}
+
+.positionInput {
+  width: 4rem;
+  padding: 0.5rem 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.positionInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.colorInput {
+  width: 44px;
+  height: 38px;
+  padding: 2px;
+  border: 1px solid var(--surface2);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.colorHex {
+  width: 6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-family: monospace;
+}
+
+.colorHex:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.deleteTextBtn {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: #c55;
+  border: 1px solid rgba(200, 80, 80, 0.4);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.deleteTextBtn:hover {
+  background: rgba(200, 80, 80, 0.08);
 }
 
 .headerInputWrap {
@@ -156,6 +288,12 @@
   margin: 0 0 0.75rem;
 }
 
+.section .hint {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+}
+
 .options {
   display: flex;
   flex-wrap: wrap;
@@ -163,8 +301,8 @@
 }
 
 .option {
-  width: 80px;
-  height: 100px;
+  width: 84px;
+  aspect-ratio: 7/5;
   border-radius: 8px;
   border: 2px solid var(--surface2);
   background: var(--surface);
@@ -176,10 +314,20 @@
   transition: border-color 0.2s;
 }
 
+.optionRadio {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  pointer-events: none;
+}
+
 .option img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  pointer-events: none;
 }
 
 .option:hover,
@@ -188,13 +336,25 @@
 }
 
 .option.upload {
+  height: 48px;
   font-size: 0.8rem;
   color: var(--text-muted);
   cursor: pointer;
+  font-family: inherit;
 }
 
 .option.upload:hover {
   color: var(--accent);
+}
+
+.option.upload:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.option.upload:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .error {

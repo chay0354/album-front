@@ -97,11 +97,14 @@
 
 /* Single cover (view 0) */
 .coverSingle {
-  aspect-ratio: 3/4;
+  aspect-ratio: 7/5;
   width: 100%;
-  max-width: 240px;
+  max-width: 440px;
   border-radius: 4px;
-  background: var(--surface2) center/cover no-repeat;
+  background-color: var(--surface2);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   position: relative;
   overflow: hidden;
   box-shadow: var(--shadow), var(--shadow-strong);
@@ -187,7 +190,8 @@
   box-shadow: 0 0 0 2px var(--accent);
 }
 
-.editPageBtn {
+.editPageBtn,
+.editPageBtnOnPage {
   padding: 0.4rem 0.75rem;
   font-size: 0.8rem;
   border-radius: 8px;
@@ -196,11 +200,57 @@
   color: var(--text-muted);
   cursor: pointer;
   white-space: nowrap;
+  font-family: inherit;
 }
 
-.editPageBtn:hover {
+.editPageBtn:hover,
+.editPageBtnOnPage:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.editPageBtnOnPage {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 2;
+  box-shadow: var(--shadow);
+}
+
+.halfPageStickers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.halfPageSticker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.halfPageSticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.dropHintBtn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  border-radius: 8px;
+  border: 1px solid var(--surface2);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: default;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.dropHintBtn:disabled {
+  opacity: 0.9;
 }
 
 .pagePhotos {
@@ -414,6 +464,22 @@
   cursor: pointer;
 }
 
+.removeItemBtn {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.removeItemBtn:hover {
+  color: var(--danger, #c53030);
+  border-color: var(--danger, #c53030);
+}
+
 /* Full-screen page editor */
 .fullScreenOverlay {
   position: fixed;
@@ -542,6 +608,33 @@
   color: var(--text-muted);
 }
 
+.colorInputRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.colorPicker {
+  width: 36px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--surface2);
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--surface);
+}
+
+.colorHexInput {
+  width: 5rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 0.8rem;
+  font-family: monospace;
+  border: 1px solid var(--surface2);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
 .fullScreenPageWrap {
   flex: 0 0 auto;
   width: 420px;
@@ -590,7 +683,236 @@
 .editorPhoto img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   pointer-events: none;
+}
+
+.editorSticker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  transition: border-color 0.15s;
+  z-index: 4;
+}
+
+.editorSticker:hover {
+  border-color: var(--accent);
+}
+
+.editorSticker .stickerImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.stickerPicker {
+  margin-top: 1rem;
+}
+
+.stickerPickerLabel {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+.stickerPickerHint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
+.stickerPickerImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.stickerPickerRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  max-width: 260px;
+}
+
+.stickerPickerBtn {
+  width: 78px;
+  height: 78px;
+  padding: 0;
+  border: 1px solid var(--surface2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.stickerPickerBtn:hover {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+
+.stickerPickerBtn img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+}
+
+.templatePicker {
+  margin-top: 1rem;
+}
+
+.templatePickerRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 260px;
+}
+
+.templatePickerBtn {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--surface2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  transition: border-color 0.2s, background 0.2s;
+  font-size: 0.85rem;
+}
+
+.templatePickerBtn:hover {
+  border-color: var(--accent);
+  background: var(--surface2);
+}
+
+.templatePickerLabel {
+  font-weight: 500;
+}
+
+.templatePickerSlots {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.clearTemplateBtn {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--surface2);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.clearTemplateBtn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.templateSlotPlaceholder {
+  position: absolute;
+  border: 2px dashed var(--surface3);
+  border-radius: 8px;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.templateSlotPlaceholder:hover {
+  border-color: var(--accent);
+  background: var(--surface3);
+}
+
+.templateSlotPlus {
+  font-size: 2.5rem;
+  font-weight: 300;
+  color: var(--text-muted);
+  line-height: 1;
+}
+
+.templateSlotPlaceholder:hover .templateSlotPlus {
+  color: var(--accent);
+}
+
+.slotPhotoPicker {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--surface2);
+}
+
+.slotPhotoPickerTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.slotPhotoPickerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  max-width: 260px;
+}
+
+.slotPhotoPickerBtn {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 2px solid var(--surface2);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s;
+}
+
+.slotPhotoPickerBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.slotPhotoPickerBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.slotPhotoPickerBtn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.slotPhotoPickerBtnUsed {
+  opacity: 0.7;
+}
+
+.slotPhotoPickerUsedLabel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font-size: 0.65rem;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  padding: 2px 4px;
+  text-align: center;
 }

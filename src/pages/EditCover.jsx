@@ -1,79 +1,139 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getAlbum, updateAlbum, getBaseCovers, uploadCover, getCoverUrl } from "../api";
+import { getAlbum, updateAlbum, getPremadeCoverList, uploadCover, getPremadeCoverUrl } from "../api";
 import styles from "./EditCover.module.css";
 
-const DEFAULT_HEADER_X = 50;
-const DEFAULT_HEADER_Y = 18;
-const DEFAULT_HEADER_FONT_SIZE = 28;
 const MIN_FONT = 14;
 const MAX_FONT = 52;
+const DEFAULT_X = 50;
+const DEFAULT_Y = 18;
+const DEFAULT_FONT_SIZE = 28;
+const DEFAULT_COLOR = "#ffffff";
+
+function isValidHex(s) {
+  return /^#[0-9A-Fa-f]{6}$/.test(s);
+}
+
+function newText(overrides = {}) {
+  return {
+    id: "t" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+    content: "",
+    x: DEFAULT_X,
+    y: DEFAULT_Y,
+    fontSize: DEFAULT_FONT_SIZE,
+    color: DEFAULT_COLOR,
+    ...overrides,
+  };
+}
+
+function loadTextsFromConfig(cfg) {
+  if (cfg.texts && Array.isArray(cfg.texts) && cfg.texts.length > 0) {
+    return cfg.texts.map((t, i) => ({
+      ...t,
+      id: t.id || "t-" + i + "-" + Math.random().toString(36).slice(2, 8),
+      color: t.color || DEFAULT_COLOR,
+    }));
+  }
+  if (cfg.headerText) {
+    return [newText({
+      content: cfg.headerText,
+      x: typeof cfg.headerX === "number" ? cfg.headerX : DEFAULT_X,
+      y: typeof cfg.headerY === "number" ? cfg.headerY : DEFAULT_Y,
+      fontSize: typeof cfg.headerFontSize === "number" ? cfg.headerFontSize : DEFAULT_FONT_SIZE,
+      color: DEFAULT_COLOR,
+    })];
+  }
+  return [];
+}
 
 export default function EditCover() {
   const { id } = useParams();
   const navigate = useNavigate();
   const coverFrameRef = useRef(null);
+  const coverUploadInputRef = useRef(null);
   const [album, setAlbum] = useState(null);
-  const [baseCovers, setBaseCovers] = useState([]);
-  const [headerText, setHeaderText] = useState("");
+  const [premadeCovers, setPremadeCovers] = useState([]);
+  const [texts, setTexts] = useState([]);
+  const [selectedTextId, setSelectedTextId] = useState(null);
   const [userEmail, setUserEmail] = useState("");
-  const [headerX, setHeaderX] = useState(DEFAULT_HEADER_X);
-  const [headerY, setHeaderY] = useState(DEFAULT_HEADER_Y);
-  const [headerFontSize, setHeaderFontSize] = useState(DEFAULT_HEADER_FONT_SIZE);
-  const [selectedCover, setSelectedCover] = useState(null);
-  const [customCoverUrl, setCustomCoverUrl] = useState(null);
+  const [selectedPremadePath, setSelectedPremadePath] = useState(null);
+  const [uploadedCoverUrl, setUploadedCoverUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [dragging, setDragging] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
   const dragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
 
   useEffect(() => {
-    getAlbum(id).then((a) => {
+    let cancelled = false;
+    Promise.all([getAlbum(id), getPremadeCoverList().catch(() => [])]).then(([a, list]) => {
+      if (cancelled) return;
       setAlbum(a);
+      setPremadeCovers(Array.isArray(list) ? list : []);
       const cfg = a.cover_config || {};
-      setHeaderText(cfg.headerText || "");
       setUserEmail(cfg.userEmail || "");
-      setHeaderX(typeof cfg.headerX === "number" ? cfg.headerX : DEFAULT_HEADER_X);
-      setHeaderY(typeof cfg.headerY === "number" ? cfg.headerY : DEFAULT_HEADER_Y);
-      setHeaderFontSize(typeof cfg.headerFontSize === "number" ? cfg.headerFontSize : DEFAULT_HEADER_FONT_SIZE);
-      setSelectedCover(a.cover_id || null);
-      setCustomCoverUrl(cfg.coverUrl || null);
+      const coverUrl = cfg.coverUrl || null;
+      if (coverUrl && typeof coverUrl === "string" && coverUrl.includes("premade-covers/")) {
+        const path = coverUrl.split("premade-covers/")[1]?.split("?")[0] || null;
+        setSelectedPremadePath(path);
+        setUploadedCoverUrl(null);
+      } else if (coverUrl) {
+        setSelectedPremadePath(null);
+        setUploadedCoverUrl(coverUrl);
+      } else {
+        setUploadedCoverUrl(null);
+        setSelectedPremadePath(Array.isArray(list) && list.length > 0 ? list[0].path : null);
+      }
+      setTexts(loadTextsFromConfig(cfg));
     }).catch((e) => setError(e.message));
-    getBaseCovers().then(setBaseCovers).catch(() => setBaseCovers([]));
+    return () => { cancelled = true; };
   }, [id]);
 
-  const handleDragStart = useCallback((e) => {
-    if (!headerText) return;
+  const selectedText = texts.find((t) => t.id === selectedTextId);
+
+  const updateText = useCallback((id, updates) => {
+    setTexts((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+  }, []);
+
+  const addText = useCallback(() => {
+    const t = newText();
+    setTexts((prev) => [...prev, t]);
+    setSelectedTextId(t.id);
+  }, []);
+
+  const removeText = useCallback((id) => {
+    setTexts((prev) => prev.filter((t) => t.id !== id));
+    if (selectedTextId === id) setSelectedTextId(null);
+  }, [selectedTextId]);
+
+  const handleDragStart = useCallback((e, textId) => {
     e.preventDefault();
-    setDragging(true);
-    dragStartRef.current = {
-      x: headerX,
-      y: headerY,
-      startX: e.clientX,
-      startY: e.clientY,
-    };
-  }, [headerText, headerX, headerY]);
+    const t = texts.find((x) => x.id === textId);
+    if (!t) return;
+    setDraggingId(textId);
+    dragStartRef.current = { x: t.x, y: t.y, startX: e.clientX, startY: e.clientY };
+  }, [texts]);
 
   useEffect(() => {
-    if (!dragging) return;
+    if (!draggingId) return;
     const frame = coverFrameRef.current;
     const onMove = (e) => {
       const rect = frame?.getBoundingClientRect();
       if (!rect) return;
       const dx = ((e.clientX - dragStartRef.current.startX) / rect.width) * 100;
       const dy = ((e.clientY - dragStartRef.current.startY) / rect.height) * 100;
-      setHeaderX(Math.max(0, Math.min(100, dragStartRef.current.x + dx)));
-      setHeaderY(Math.max(0, Math.min(100, dragStartRef.current.y + dy)));
+      const newX = Math.max(0, Math.min(100, dragStartRef.current.x + dx));
+      const newY = Math.max(0, Math.min(100, dragStartRef.current.y + dy));
+      updateText(draggingId, { x: newX, y: newY });
     };
-    const onUp = () => setDragging(false);
+    const onUp = () => setDraggingId(null);
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [dragging]);
+  }, [draggingId, updateText]);
 
   async function handleCoverUpload(e) {
     const file = e.target.files?.[0];
@@ -82,8 +142,8 @@ export default function EditCover() {
     setError(null);
     try {
       const { url } = await uploadCover(file);
-      setCustomCoverUrl(url);
-      setSelectedCover(null);
+      setSelectedPremadePath(null);
+      setUploadedCoverUrl(url);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -91,24 +151,22 @@ export default function EditCover() {
     }
   }
 
-  function coverImage(c) {
-    if (c?.storage_path) return getCoverUrl(c.storage_path);
-    return null;
+  function handleSelectPremade(path) {
+    if (!path) return;
+    setUploadedCoverUrl(null);
+    setSelectedPremadePath(path);
   }
 
   async function handleNext() {
     setSaving(true);
     setError(null);
     try {
+      const coverUrl = uploadedCoverUrl || (selectedPremadePath ? getPremadeCoverUrl(selectedPremadePath) : null);
       await updateAlbum(id, {
-        cover_id: selectedCover || null,
         cover_config: {
-          headerText,
           userEmail,
-          headerX,
-          headerY,
-          headerFontSize,
-          coverUrl: customCoverUrl || undefined,
+          coverUrl: coverUrl || undefined,
+          texts: texts.filter((t) => t.content.trim() !== "").map(({ id: _id, ...t }) => t),
         },
       });
       navigate(`/album/${id}/pages`);
@@ -121,25 +179,15 @@ export default function EditCover() {
 
   if (!album) return <div className={styles.center}><span className={styles.spinner} /></div>;
 
-  const currentCoverUrl = customCoverUrl || (selectedCover && coverImage(baseCovers.find((c) => c.id === selectedCover)));
+  const currentCoverUrl = uploadedCoverUrl || (selectedPremadePath ? getPremadeCoverUrl(selectedPremadePath) : null);
+  const customCoverUrl = currentCoverUrl; // alias so any reference to customCoverUrl works
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <h1>עיצוב כריכה</h1>
-        <p className={styles.sub}>בחר רקע כריכה והוסף כותרת</p>
+        <p className={styles.sub}>בחר רקע והוסף טקסטים על הכריכה</p>
       </header>
-
-      <div className={styles.headerInputWrap}>
-        <label className={styles.headerLabel}>כותרת על הכריכה</label>
-        <input
-          type="text"
-          value={headerText}
-          onChange={(e) => setHeaderText(e.target.value)}
-          placeholder="כותרת האלבום"
-          className={styles.headerInput}
-        />
-      </div>
 
       <div className={styles.headerInputWrap}>
         <label className={styles.headerLabel}>אימייל</label>
@@ -152,65 +200,163 @@ export default function EditCover() {
         />
       </div>
 
-      <div className={styles.sizeRow}>
-        <label className={styles.headerLabel}>גודל הכותרת</label>
-        <input
-          type="range"
-          min={MIN_FONT}
-          max={MAX_FONT}
-          value={headerFontSize}
-          onChange={(e) => setHeaderFontSize(Number(e.target.value))}
-          className={styles.sizeSlider}
-        />
-        <span className={styles.sizeValue}>{headerFontSize}px</span>
+      <div className={styles.textToolbar}>
+        <button type="button" className={styles.addTextBtn} onClick={addText}>
+          + הוסף טקסט
+        </button>
+        {texts.length > 0 && (
+          <p className={styles.dragHint}>לחץ על טקסט על הכריכה כדי לבחור • גרור להזזה</p>
+        )}
       </div>
-      <p className={styles.dragHint}>גרור את הכותרת על הכריכה כדי להזיז אותה</p>
 
       <div className={styles.preview}>
-        <div
-          ref={coverFrameRef}
-          className={styles.coverFrame}
-          style={currentCoverUrl ? { backgroundImage: `url(${currentCoverUrl})` } : {}}
-        >
-          <div className={styles.coverOverlay} />
-          {headerText ? (
+        <div ref={coverFrameRef} className={styles.coverFrame}>
+          {currentCoverUrl ? (
             <div
-              className={styles.coverTextDisplay + (dragging ? " " + styles.dragging : "")}
+              className={styles.coverFrameBg}
+              style={{ backgroundImage: `url("${currentCoverUrl}")` }}
+              aria-hidden
+            />
+          ) : null}
+          <div className={styles.coverOverlay} />
+          {texts.map((t) => (
+            <div
+              key={t.id}
+              className={
+                styles.coverTextDisplay +
+                (draggingId === t.id ? " " + styles.dragging : "") +
+                (selectedTextId === t.id ? " " + styles.selectedText : "")
+              }
               style={{
-                left: `${headerX}%`,
-                top: `${headerY}%`,
+                left: `${t.x}%`,
+                top: `${t.y}%`,
                 transform: "translate(-50%, -50%)",
-                fontSize: `${headerFontSize}px`,
+                fontSize: `${t.fontSize}px`,
+                color: isValidHex(t.color) ? t.color : DEFAULT_COLOR,
               }}
-              onMouseDown={handleDragStart}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                setSelectedTextId(t.id);
+                handleDragStart(e, t.id);
+              }}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && handleDragStart(e)}
-              aria-label="גרור להזזת הכותרת"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") setSelectedTextId(t.id);
+              }}
+              aria-label="טקסט על הכריכה"
             >
-              <span className={styles.coverTitle}>{headerText}</span>
+              <span className={styles.coverTitle}>
+                {t.content.trim() || "טקסט"}
+              </span>
             </div>
-          ) : null}
+          ))}
         </div>
       </div>
 
+      {selectedText && (
+        <div className={styles.textEditorPanel}>
+          <h3 className={styles.textEditorTitle}>עריכת טקסט</h3>
+          <div className={styles.textEditorRow}>
+            <label className={styles.headerLabel}>תוכן</label>
+            <input
+              type="text"
+              value={selectedText.content}
+              onChange={(e) => updateText(selectedText.id, { content: e.target.value })}
+              placeholder="הטקסט על הכריכה"
+              className={styles.headerInput}
+            />
+          </div>
+          <div className={styles.textEditorRow}>
+            <label className={styles.headerLabel}>גודל</label>
+            <div className={styles.sizeRow}>
+              <input
+                type="range"
+                min={MIN_FONT}
+                max={MAX_FONT}
+                value={selectedText.fontSize}
+                onChange={(e) => updateText(selectedText.id, { fontSize: Number(e.target.value) })}
+                className={styles.sizeSlider}
+              />
+              <span className={styles.sizeValue}>{selectedText.fontSize}px</span>
+            </div>
+          </div>
+          <div className={styles.textEditorRow}>
+            <label className={styles.headerLabel}>צבע</label>
+            <div className={styles.colorRow}>
+              <input
+                type="color"
+                value={selectedText.color}
+                onChange={(e) => updateText(selectedText.id, { color: e.target.value })}
+                className={styles.colorInput}
+                aria-label="בחר צבע"
+              />
+              <input
+                type="text"
+                value={selectedText.color}
+                onChange={(e) => updateText(selectedText.id, { color: e.target.value.startsWith("#") ? e.target.value : "#" + e.target.value })}
+                className={styles.colorHex}
+                placeholder="#ffffff"
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            className={styles.deleteTextBtn}
+            onClick={() => removeText(selectedText.id)}
+          >
+            מחק טקסט
+          </button>
+        </div>
+      )}
+
       <section className={styles.section}>
         <h3>בחר רקע כריכה</h3>
-        <div className={styles.options}>
-          {baseCovers.map((c) => (
+        {premadeCovers.length === 0 && (
+          <p className={styles.hint}>אין כריכות מוכנות. העלה תמונה למטה או הוסף כריכות ל־premade-covers.</p>
+        )}
+        <div className={styles.options} role="group" aria-label="בחר רקע כריכה">
+          {premadeCovers.map((c) => {
+            const url = getPremadeCoverUrl(c.path);
+            const isSelected = selectedPremadePath === c.path;
+            const path = c.path;
+            return (
+              <label
+                key={"premade-" + path}
+                className={styles.option + (isSelected ? " " + styles.selected : "")}
+                style={{ cursor: "pointer" }}
+              >
+                <input
+                  type="radio"
+                  name="cover-premade"
+                  value={path}
+                  checked={isSelected}
+                  onChange={() => path && handleSelectPremade(path)}
+                  className={styles.optionRadio}
+                />
+                <img src={url} alt="" />
+              </label>
+            );
+          })}
+          <>
+            <input
+              ref={coverUploadInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCoverUpload}
+              disabled={uploading}
+              style={{ display: "none" }}
+              aria-hidden
+            />
             <button
-              key={c.id}
               type="button"
-              className={styles.option + (selectedCover === c.id ? " " + styles.selected : "")}
-              onClick={() => { setSelectedCover(c.id); setCustomCoverUrl(null); }}
+              className={styles.option + " " + styles.upload}
+              onClick={() => coverUploadInputRef.current?.click()}
+              disabled={uploading}
             >
-              <img src={getCoverUrl(c.storage_path)} alt="" />
+              {uploading ? "מעלה..." : "העלה תמונה"}
             </button>
-          ))}
-          <label className={styles.option + styles.upload}>
-            <input type="file" accept="image/*" onChange={handleCoverUpload} disabled={uploading} hidden />
-            {uploading ? "מעלה..." : "העלה תמונה"}
-          </label>
+          </>
         </div>
       </section>
 

@@ -40,6 +40,18 @@ export async function getBaseCovers() {
   return r.json();
 }
 
+export async function getCoverList() {
+  const r = await fetch(`${API}/covers/list`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getPremadeCoverList() {
+  const r = await fetch(`${API}/covers/premade`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function uploadCover(file) {
   const fd = new FormData();
   fd.append("file", file);
@@ -57,6 +69,16 @@ export async function addPage(albumId) {
 export async function deletePage(albumId, pageId) {
   const r = await fetch(`${API}/albums/${albumId}/pages/${pageId}`, { method: "DELETE" });
   if (!r.ok) throw new Error(await r.text());
+}
+
+export async function updatePageConfig(albumId, pageId, pageConfig) {
+  const r = await fetch(`${API}/albums/${albumId}/pages/${pageId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ page_config: pageConfig }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
 export async function uploadPhotos(albumId, pageId, files) {
@@ -121,6 +143,24 @@ export function getCoverUrl(storagePath) {
   if (!storagePath) return null;
   if (storagePath.startsWith("http")) return storagePath;
   return `${import.meta.env.VITE_SUPABASE_URL || ""}/storage/v1/object/public/covers/${storagePath}`;
+}
+
+export function getPremadeCoverUrl(storagePath) {
+  if (!storagePath) return null;
+  if (storagePath.startsWith("http")) return storagePath;
+  return `${import.meta.env.VITE_SUPABASE_URL || ""}/storage/v1/object/public/premade-covers/${storagePath}`;
+}
+
+export async function getElementsList() {
+  const r = await fetch(`${API}/covers/elements`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export function getElementUrl(storagePath) {
+  if (!storagePath) return null;
+  if (storagePath.startsWith("http")) return storagePath;
+  return `${import.meta.env.VITE_SUPABASE_URL || ""}/storage/v1/object/public/elements/${storagePath}`;
 }
 
 export function getPdfDownloadUrl(albumId) {
