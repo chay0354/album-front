@@ -106,34 +106,48 @@ export default function EditCover() {
     if (selectedTextId === id) setSelectedTextId(null);
   }, [selectedTextId]);
 
+  const getCoords = useCallback((e) => {
+    if (e.touches?.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    if (e.changedTouches?.length) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    return { x: e.clientX, y: e.clientY };
+  }, []);
+
   const handleDragStart = useCallback((e, textId) => {
     e.preventDefault();
     const t = texts.find((x) => x.id === textId);
     if (!t) return;
     setDraggingId(textId);
-    dragStartRef.current = { x: t.x, y: t.y, startX: e.clientX, startY: e.clientY };
-  }, [texts]);
+    const { x, y } = getCoords(e);
+    dragStartRef.current = { x: t.x, y: t.y, startX: x, startY: y };
+  }, [texts, getCoords]);
 
   useEffect(() => {
     if (!draggingId) return;
     const frame = coverFrameRef.current;
     const onMove = (e) => {
+      e.preventDefault();
       const rect = frame?.getBoundingClientRect();
       if (!rect) return;
-      const dx = ((e.clientX - dragStartRef.current.startX) / rect.width) * 100;
-      const dy = ((e.clientY - dragStartRef.current.startY) / rect.height) * 100;
+      const { x, y } = getCoords(e);
+      const dx = ((x - dragStartRef.current.startX) / rect.width) * 100;
+      const dy = ((y - dragStartRef.current.startY) / rect.height) * 100;
       const newX = Math.max(0, Math.min(100, dragStartRef.current.x + dx));
       const newY = Math.max(0, Math.min(100, dragStartRef.current.y + dy));
       updateText(draggingId, { x: newX, y: newY });
     };
     const onUp = () => setDraggingId(null);
+    const opts = { passive: false };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, opts);
+    window.addEventListener("touchend", onUp);
     return () => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
     };
-  }, [draggingId, updateText]);
+  }, [draggingId, updateText, getCoords]);
 
   async function handleCoverUpload(e) {
     const file = e.target.files?.[0];
@@ -235,6 +249,11 @@ export default function EditCover() {
                 color: isValidHex(t.color) ? t.color : DEFAULT_COLOR,
               }}
               onMouseDown={(e) => {
+                e.stopPropagation();
+                setSelectedTextId(t.id);
+                handleDragStart(e, t.id);
+              }}
+              onTouchStart={(e) => {
                 e.stopPropagation();
                 setSelectedTextId(t.id);
                 handleDragStart(e, t.id);
@@ -342,7 +361,7 @@ export default function EditCover() {
             <input
               ref={coverUploadInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,image/heic,image/heif"
               onChange={handleCoverUpload}
               disabled={uploading}
               style={{ display: "none" }}

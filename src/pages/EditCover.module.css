@@ -82,6 +82,7 @@
   white-space: nowrap;
   max-width: 90%;
   text-align: center;
+  touch-action: none;
 }
 
 .coverTextDisplay.dragging {

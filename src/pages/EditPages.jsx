@@ -216,25 +216,34 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     }
   }, [photos, templateSlots]);
 
+  const getCoords = useCallback((e) => {
+    if (e.touches?.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    if (e.changedTouches?.length) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    return { x: e.clientX, y: e.clientY };
+  }, []);
+
   const handleMouseDown = useCallback((e, photoId) => {
     e.preventDefault();
     e.stopPropagation();
+    const { x: startX, y: startY } = getCoords(e);
     const layout = layouts[photoId] || DEFAULT_LAYOUT(0);
     dragRef.current = {
       type: "photo",
       id: photoId,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX,
+      startY,
       startLayout: { ...layout },
       dragStarted: false,
     };
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const onMove = (e) => {
+    const onMove = (ev) => {
+      ev.preventDefault();
       const ref = dragRef.current;
       if (!ref.id) return;
-      const dist = Math.hypot(e.clientX - ref.startX, e.clientY - ref.startY);
+      const { x, y } = getCoords(ev);
+      const dist = Math.hypot(x - ref.startX, y - ref.startY);
       if (!ref.dragStarted) {
         if (dist > 5) {
           ref.dragStarted = true;
@@ -242,17 +251,17 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
           else setDraggingStickerId(ref.id);
         } else return;
       }
-      const dx = ((e.clientX - ref.startX) / rect.width) * 100;
-      const dy = ((e.clientY - ref.startY) / rect.height) * 100;
+      const dx = ((x - ref.startX) / rect.width) * 100;
+      const dy = ((y - ref.startY) / rect.height) * 100;
       if (ref.type === "photo") {
         setLayouts((prev) => {
           const l = prev[ref.id] || ref.startLayout;
           if (!l || typeof l.x !== "number") return prev;
-          let x = ref.startLayout.x + dx;
-          let y = ref.startLayout.y + dy;
-          x = Math.max(0, Math.min(100 - l.w, x));
-          y = Math.max(0, Math.min(100 - l.h, y));
-          return { ...prev, [ref.id]: { ...l, x, y } };
+          let newX = ref.startLayout.x + dx;
+          let newY = ref.startLayout.y + dy;
+          newX = Math.max(0, Math.min(100 - l.w, newX));
+          newY = Math.max(0, Math.min(100 - l.h, newY));
+          return { ...prev, [ref.id]: { ...l, x: newX, y: newY } };
         });
       } else {
         setPageConfig((prev) => ({
@@ -279,35 +288,43 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       dragRef.current.id = null;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
     };
+    const opts = { passive: false };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, [layouts]);
+    window.addEventListener("touchmove", onMove, opts);
+    window.addEventListener("touchend", onUp);
+  }, [layouts, getCoords]);
 
   const handleStickerMouseDown = useCallback((e, sticker) => {
     e.preventDefault();
     e.stopPropagation();
+    const { x: startX, y: startY } = getCoords(e);
     dragRef.current = {
       type: "sticker",
       id: sticker.id,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX,
+      startY,
       startLayout: { x: sticker.x ?? 10, y: sticker.y ?? 10 },
       dragStarted: false,
     };
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    const onMove = (e) => {
+    const onMove = (ev) => {
+      ev.preventDefault();
       const ref = dragRef.current;
       if (!ref.id || ref.type !== "sticker") return;
-      const dist = Math.hypot(e.clientX - ref.startX, e.clientY - ref.startY);
+      const { x, y } = getCoords(ev);
+      const dist = Math.hypot(x - ref.startX, y - ref.startY);
       if (!ref.dragStarted && dist > 5) {
         ref.dragStarted = true;
         setDraggingStickerId(ref.id);
       }
-      const dx = ((e.clientX - ref.startX) / rect.width) * 100;
-      const dy = ((e.clientY - ref.startY) / rect.height) * 100;
+      const dx = ((x - ref.startX) / rect.width) * 100;
+      const dy = ((y - ref.startY) / rect.height) * 100;
       setPageConfig((prev) => ({
         ...prev,
         stickers: (prev.stickers || []).map((s) =>
@@ -330,10 +347,15 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       dragRef.current.id = null;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
     };
+    const opts = { passive: false };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
-  }, []);
+    window.addEventListener("touchmove", onMove, opts);
+    window.addEventListener("touchend", onUp);
+  }, [getCoords]);
 
   function addSticker(path) {
     if (!path) return;
@@ -486,6 +508,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                             transform: rot ? `rotate(${rot}deg)` : undefined,
                           }}
                           onMouseDown={(e) => handleMouseDown(e, p.id)}
+                          onTouchStart={(e) => handleMouseDown(e, p.id)}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <img src={getPhotoUrl(p.storage_path)} alt="" draggable={false} />
@@ -551,6 +574,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                         transform: rot ? `rotate(${rot}deg)` : undefined,
                       }}
                       onMouseDown={(e) => handleMouseDown(e, p.id)}
+                      onTouchStart={(e) => handleMouseDown(e, p.id)}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <img src={getPhotoUrl(p.storage_path)} alt="" draggable={false} />
@@ -582,6 +606,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                       transform: rot ? `rotate(${rot}deg)` : undefined,
                     }}
                     onMouseDown={(e) => handleStickerMouseDown(e, sticker)}
+                    onTouchStart={(e) => handleStickerMouseDown(e, sticker)}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <img src={imgUrl} alt="" className={styles.stickerImg} />
@@ -694,7 +719,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                 <input
                   ref={slotFileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,image/heic,image/heif"
                   multiple={false}
                   onChange={(e) => {
                     const files = e.target.files;
