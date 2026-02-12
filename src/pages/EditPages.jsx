@@ -176,8 +176,8 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     const cfg = page?.page_config || {};
     setPageConfig((prev) => ({
       ...prev,
-      backgroundColor: cfg.backgroundColor ?? DEFAULT_PAGE_BG,
-      textColor: cfg.textColor ?? DEFAULT_PAGE_TEXT_COLOR,
+      backgroundColor: cfg.backgroundColor ?? prev.backgroundColor ?? DEFAULT_PAGE_BG,
+      textColor: cfg.textColor ?? prev.textColor ?? DEFAULT_PAGE_TEXT_COLOR,
       stickers: Array.isArray(cfg.stickers) ? cfg.stickers : [],
     }));
   }, [page?.id, page?.page_config]);
@@ -384,7 +384,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
   async function handleRemovePhoto() {
     if (!selectedId || !onRemovePhoto) return;
     try {
-      await onRemovePhoto(selectedId);
+      await onRemovePhoto(selectedId, pageConfig);
       setSelectedId(null);
     } catch (err) {
       onSaveError?.(err?.message || "שגיאה בהסרת תמונה");
@@ -1111,12 +1111,12 @@ export default function EditPages() {
           onSave={refreshAlbum}
           onClose={() => setEditingPage(null)}
           onSaveError={(msg) => setError(msg)}
-          onRemovePhoto={async (photoId) => {
+          onRemovePhoto={async (photoId, editorPageConfig) => {
             await removePhoto(id, editingPage.id, photoId);
             const a = await getAlbum(id);
             setAlbum(a);
             const updated = a.pages?.find((p) => p.id === editingPage.id);
-            if (updated) setEditingPage(updated);
+            if (updated) setEditingPage({ ...updated, page_config: { ...updated?.page_config, ...(editorPageConfig || {}) } });
           }}
           onUploadToPage={async (files, editorPageConfig) => {
             try {
