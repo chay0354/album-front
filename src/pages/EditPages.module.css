@@ -1005,7 +1005,8 @@
     width: 100%;
     max-width: 100%;
     flex: none;
-    max-height: 100px;
+    aspect-ratio: 3/4;
+    max-height: 44vh;
     margin-bottom: 0.75rem;
     flex-shrink: 0;
   }
