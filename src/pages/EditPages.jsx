@@ -1126,7 +1126,9 @@ export default function EditPages() {
               const updated = a.pages?.find((p) => p.id === editingPage.id);
               if (updated) setEditingPage({ ...updated, page_config: { ...updated?.page_config, ...(editorPageConfig || {}) } });
             } catch (e) {
-              setError(e.message);
+              const msg = e?.message || "";
+              const isTooLarge = /PAYLOAD_TOO_LARGE|413|too large|גדול/i.test(msg);
+              setError(isTooLarge ? "התמונה גדולה מדי. נסה לבחור תמונה קטנה יותר או צלם במצב חיסכון." : msg);
             }
           }}
         />
