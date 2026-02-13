@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAlbum, updateAlbum, getPremadeCoverList, uploadCover, getPremadeCoverUrl } from "../api";
 import StageIndicator from "../components/StageIndicator";
+import AlbumLoading from "../components/AlbumLoading";
 import styles from "./EditCover.module.css";
 
 const MIN_FONT = 14;
@@ -192,7 +193,7 @@ export default function EditCover() {
     }
   }
 
-  if (!album) return <div className={styles.center}><span className={styles.spinner} /></div>;
+  if (!album) return <AlbumLoading />;
 
   const currentCoverUrl = uploadedCoverUrl || (selectedPremadePath ? getPremadeCoverUrl(selectedPremadePath) : null);
   const customCoverUrl = currentCoverUrl; // alias so any reference to customCoverUrl works

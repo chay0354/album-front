@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import HTMLFlipBook from "react-pageflip";
 import { getAlbum, getBaseCovers, getPhotoUrl, getCoverUrl, getElementUrl } from "../api";
 import StageIndicator from "../components/StageIndicator";
+import AlbumLoading from "../components/AlbumLoading";
 import styles from "./Preview.module.css";
 
 const DEFAULT_LAYOUT = (index) => {
@@ -11,10 +12,12 @@ const DEFAULT_LAYOUT = (index) => {
   return { x: col * 48 + 2, y: row * 48 + 2, w: 46, h: 46, rotation: 0 };
 };
 
-const BOOK_WIDTH = 340;
-const BOOK_HEIGHT = 460;
+export const BOOK_WIDTH_MOBILE = 340;
+export const BOOK_HEIGHT_MOBILE = 460;
+export const BOOK_WIDTH_DESKTOP = 680;
+export const BOOK_HEIGHT_DESKTOP = 920;
 
-const CoverPage = forwardRef(function CoverPage({ album, coverUrl }, ref) {
+export const CoverPage = forwardRef(function CoverPage({ album, coverUrl }, ref) {
   const cfg = album?.cover_config || {};
   const texts = Array.isArray(cfg.texts) && cfg.texts.length > 0
     ? cfg.texts
@@ -46,7 +49,7 @@ const CoverPage = forwardRef(function CoverPage({ album, coverUrl }, ref) {
   );
 });
 
-const BackCoverPage = forwardRef(function BackCoverPage({ coverUrl }, ref) {
+export const BackCoverPage = forwardRef(function BackCoverPage({ coverUrl }, ref) {
   const coverStyle = coverUrl
     ? { backgroundImage: `url("${coverUrl}")`, backgroundPosition: "right center" }
     : { background: "#333" };
@@ -142,15 +145,18 @@ const SpreadPage = forwardRef(function SpreadPage({ leftPage, rightPage, getPhot
   );
 });
 
-function HalfContent({ photos, stickers, hasLayout, getPhotoUrl, getElementUrl }) {
+function HalfContent({ photos, stickers, texts, hasLayout, getPhotoUrl, getElementUrl }) {
   const photosList = (photos || []).sort((a, b) => a.photo_order - b.photo_order);
   const hasLayoutPhotos = photosList.some((p) => p.layout && typeof p.layout.x === "number");
+  const textsList = Array.isArray(texts) ? texts : [];
   return (
     <>
       <div className={styles.flipHalfPhotos}>
         {photosList.map((p, i) => {
           const layout = p.layout && typeof p.layout.x === "number" ? p.layout : DEFAULT_LAYOUT(i);
           const rot = layout.rotation ?? 0;
+          const crop = layout?.crop && typeof layout.crop.w === "number" ? layout.crop : null;
+          const hasCrop = crop && (crop.l > 0 || crop.t > 0 || crop.w < 100 || crop.h < 100);
           return (
             <div
               key={p.id}
@@ -163,7 +169,23 @@ function HalfContent({ photos, stickers, hasLayout, getPhotoUrl, getElementUrl }
                 transform: rot ? `rotate(${rot}deg)` : undefined,
               }}
             >
-              <img src={getPhotoUrl(p.storage_path)} alt="" />
+              {hasCrop ? (
+                <div className={styles.flipHalfPhotoCropWrap}>
+                  <img
+                    src={getPhotoUrl(p.storage_path)}
+                    alt=""
+                    className={styles.flipHalfPhotoCroppedImg}
+                    style={{
+                      width: `${(100 / crop.w) * 100}%`,
+                      height: `${(100 / crop.h) * 100}%`,
+                      left: `${-(crop.l / crop.w) * 100}%`,
+                      top: `${-(crop.t / crop.h) * 100}%`,
+                    }}
+                  />
+                </div>
+              ) : (
+                <img src={getPhotoUrl(p.storage_path)} alt="" />
+              )}
             </div>
           );
         })}
@@ -193,11 +215,30 @@ function HalfContent({ photos, stickers, hasLayout, getPhotoUrl, getElementUrl }
           );
         })}
       </div>
+      {textsList.length > 0 && (
+        <div className={styles.flipHalfTexts}>
+          {textsList.map((t, i) => (
+            <div
+              key={t.id || i}
+              className={styles.flipHalfText}
+              style={{
+                left: `${t.x ?? 50}%`,
+                top: `${t.y ?? 25}%`,
+                transform: "translate(-50%, -50%)",
+                fontSize: `clamp(12px, 3vw, ${t.fontSize ?? 28}px)`,
+                color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#000",
+              }}
+            >
+              {t.content}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }
 
-const SinglePage = forwardRef(function SinglePage({ page, getPhotoUrl, getElementUrl }, ref) {
+export const SinglePage = forwardRef(function SinglePage({ page, getPhotoUrl, getElementUrl }, ref) {
   const bg = page?.page_config?.backgroundColor || "#fff";
   const photos = page?.album_photos || [];
   const stickers = page?.page_config?.stickers || [];
@@ -208,6 +249,7 @@ const SinglePage = forwardRef(function SinglePage({ page, getPhotoUrl, getElemen
           <HalfContent
             photos={photos}
             stickers={stickers}
+            texts={page?.page_config?.texts}
             hasLayout={photos.some((p) => p.layout && typeof p.layout.x === "number")}
             getPhotoUrl={getPhotoUrl}
             getElementUrl={getElementUrl}
@@ -218,7 +260,7 @@ const SinglePage = forwardRef(function SinglePage({ page, getPhotoUrl, getElemen
   );
 });
 
-function useMobile(breakpoint = 768) {
+export function useMobile(breakpoint = 768) {
   const [mobile, setMobile] = useState(typeof window !== "undefined" && window.innerWidth <= breakpoint);
   useEffect(() => {
     const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
@@ -265,76 +307,55 @@ export default function Preview() {
     setCurrentPage(e.data);
   }, []);
 
-  if (!album) return <div className={styles.center}><span className={styles.spinner} /></div>;
+  if (!album) return <AlbumLoading />;
 
   const pages = album.pages || [];
-  const spreadCount = Math.max(1, Math.ceil(pages.length / 2));
   const coverUrl = coverImageUrl ?? album?.cover_config?.coverUrl ?? null;
 
-  const contentCount = isMobile ? pages.length : spreadCount;
-  const totalFlipPages = 1 + contentCount + 1;
-  const pageLabels = isMobile
-    ? ["כריכה", ...pages.map((_, i) => `עמוד ${i + 1}`), "כריכה אחורית"]
-    : ["כריכה", ...Array.from({ length: spreadCount }, (_, i) => {
-        const left = i * 2;
-        const right = left + 1;
-        return right < pages.length ? `עמודים ${left + 1}–${right + 1}` : `עמוד ${left + 1}`;
-      }), "כריכה אחורית"];
+  const totalFlipPages = 1 + pages.length + 1;
+  const pageLabels = ["כריכה", ...pages.map((_, i) => `עמוד ${i + 1}`), "כריכה אחורית"];
 
-  const bookPages = isMobile
-    ? [
-        <CoverPage key="cover" album={album} coverUrl={coverUrl} />,
-        ...pages.map((page, i) => (
-          <SinglePage
-            key={i}
-            page={page}
-            getPhotoUrl={getPhotoUrl}
-            getElementUrl={getElementUrl}
-          />
-        )),
-        <BackCoverPage key="back" coverUrl={coverUrl} />,
-      ]
-    : [
-        <CoverPage key="cover" album={album} coverUrl={coverUrl} />,
-        ...Array.from({ length: spreadCount }, (_, i) => (
-          <SpreadPage
-            key={i}
-            leftPage={pages[i * 2] || null}
-            rightPage={pages[i * 2 + 1] || null}
-            getPhotoUrl={getPhotoUrl}
-            getElementUrl={getElementUrl}
-          />
-        )),
-        <BackCoverPage key="back" coverUrl={coverUrl} />,
-      ];
+  const bookPages = [
+    <CoverPage key="cover" album={album} coverUrl={coverUrl} />,
+    ...pages.map((page, i) => (
+      <SinglePage
+        key={i}
+        page={page}
+        getPhotoUrl={getPhotoUrl}
+        getElementUrl={getElementUrl}
+      />
+    )),
+    <BackCoverPage key="back" coverUrl={coverUrl} />,
+  ];
 
   return (
     <div className={styles.page}>
       <StageIndicator current={4} />
       <header className={styles.header}>
         <h1>צפייה באלבום</h1>
-        <p className={styles.sub}>עיין באלבום כמו ספר אמיתי – גרור לפינה כדי לדפדף.</p>
       </header>
 
       <div className={styles.bookWrap}>
-        <div className={styles.bookContainer}>
+        <div className={styles.bookFrame}>
+          <div className={styles.bookContainer}>
           <HTMLFlipBook
             ref={bookRef}
-            width={BOOK_WIDTH}
-            height={BOOK_HEIGHT}
+            width={isMobile ? BOOK_WIDTH_MOBILE : BOOK_WIDTH_DESKTOP}
+            height={isMobile ? BOOK_HEIGHT_MOBILE : BOOK_HEIGHT_DESKTOP}
             size="fixed"
             showCover={true}
             drawShadow={true}
             flippingTime={600}
             usePortrait={true}
             startZIndex={0}
-            useMouseEvents={true}
-            swipeDistance={30}
+            useMouseEvents={false}
+            swipeDistance={0}
             onFlip={onFlip}
             key={isMobile ? "mobile" : "desktop"}
           >
             {bookPages}
           </HTMLFlipBook>
+          </div>
         </div>
 
         <div className={styles.navWrap}>

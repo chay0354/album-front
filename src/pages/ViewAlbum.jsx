@@ -1,143 +1,28 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
+import HTMLFlipBook from "react-pageflip";
 import { getAlbumByShareToken, getBaseCovers, getPhotoUrl, getCoverUrl, getElementUrl } from "../api";
-import styles from "./EditPages.module.css";
-
-const DEFAULT_LAYOUT = (index) => {
-  const col = index % 2;
-  const row = Math.floor(index / 2);
-  return { x: col * 48 + 2, y: row * 48 + 2, w: 46, h: 46, rotation: 0 };
-};
-
-function CoverDisplay({ album, coverUrl }) {
-  const cfg = album?.cover_config || {};
-  const texts = Array.isArray(cfg.texts) && cfg.texts.length > 0
-    ? cfg.texts
-    : cfg.headerText
-      ? [{ content: cfg.headerText, x: cfg.headerX ?? 50, y: cfg.headerY ?? 18, fontSize: cfg.headerFontSize ?? 28, color: "#ffffff" }]
-      : [];
-  const coverStyle = coverUrl
-    ? { backgroundImage: `url("${coverUrl}")`, background: `center/cover no-repeat url("${coverUrl}")` }
-    : {};
-  return (
-    <div className={styles.coverSingle} style={coverStyle}>
-      <div className={styles.coverOverlay} />
-      {texts.map((t, i) => (
-        <div
-          key={i}
-          className={styles.coverTitleOnModel}
-          style={{
-            left: `${t.x ?? 50}%`,
-            top: `${t.y ?? 18}%`,
-            transform: "translate(-50%, -50%)",
-            fontSize: `${t.fontSize ?? 28}px`,
-            color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
-          }}
-        >
-          {t.content}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SpreadDisplay({ leftPage, rightPage, getPhotoUrl, getElementUrl }) {
-  const photosLeft = (leftPage?.album_photos || []).sort((a, b) => a.photo_order - b.photo_order);
-  const photosRight = (rightPage?.album_photos || []).sort((a, b) => a.photo_order - b.photo_order);
-  const hasLayoutLeft = photosLeft.some((p) => p.layout && typeof p.layout.x === "number");
-  const hasLayoutRight = photosRight.some((p) => p.layout && typeof p.layout.x === "number");
-  const stickersLeft = leftPage?.page_config?.stickers || [];
-  const stickersRight = rightPage?.page_config?.stickers || [];
-
-  function Photos({ photos, useLayout }) {
-    if (!photos.length) return null;
-    return (
-      <div className={styles.pagePhotosAbsolute}>
-        {photos.map((p, i) => {
-          const layout = p.layout && typeof p.layout.x === "number" ? p.layout : DEFAULT_LAYOUT(i);
-          const rot = layout.rotation ?? 0;
-          return (
-            <div
-              key={p.id}
-              className={styles.placedPhoto}
-              style={{
-                left: `${layout.x}%`,
-                top: `${layout.y}%`,
-                width: `${layout.w}%`,
-                height: `${layout.h}%`,
-                transform: rot ? `rotate(${rot}deg)` : undefined,
-              }}
-            >
-              <img src={getPhotoUrl(p.storage_path)} alt="" />
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  function Stickers({ stickers }) {
-    if (!Array.isArray(stickers) || stickers.length === 0) return null;
-    return (
-      <div className={styles.halfPageStickers} aria-hidden>
-        {stickers.map((s) => {
-          if (!s.path) return null;
-          const x = s.x ?? 10;
-          const y = s.y ?? 10;
-          const w = s.w ?? 12;
-          const h = s.h ?? 12;
-          const rot = s.rotation ?? 0;
-          return (
-            <div
-              key={s.id}
-              className={styles.halfPageSticker}
-              style={{
-                left: `${x}%`,
-                top: `${y}%`,
-                width: `${w}%`,
-                height: `${h}%`,
-                transform: rot ? `rotate(${rot}deg)` : undefined,
-              }}
-            >
-              <img src={getElementUrl(s.path)} alt="" />
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.spread}>
-      <div className={styles.halfPageWrapper}>
-        <div
-          className={styles.halfPage}
-          style={leftPage?.page_config?.backgroundColor ? { background: leftPage.page_config.backgroundColor } : undefined}
-        >
-          <Photos photos={photosLeft} useLayout={hasLayoutLeft} />
-          <Stickers stickers={stickersLeft} />
-        </div>
-      </div>
-      <div className={styles.spine} />
-      <div className={styles.halfPageWrapper}>
-        <div
-          className={styles.halfPage}
-          style={rightPage?.page_config?.backgroundColor ? { background: rightPage.page_config.backgroundColor } : undefined}
-        >
-          <Photos photos={photosRight} useLayout={hasLayoutRight} />
-          <Stickers stickers={stickersRight} />
-        </div>
-      </div>
-    </div>
-  );
-}
+import AlbumLoading from "../components/AlbumLoading";
+import {
+  CoverPage,
+  BackCoverPage,
+  SinglePage,
+  useMobile,
+  BOOK_WIDTH_MOBILE,
+  BOOK_HEIGHT_MOBILE,
+  BOOK_WIDTH_DESKTOP,
+  BOOK_HEIGHT_DESKTOP,
+} from "./Preview";
+import styles from "./Preview.module.css";
 
 export default function ViewAlbum() {
   const { token } = useParams();
   const [album, setAlbum] = useState(null);
   const [coverImageUrl, setCoverImageUrl] = useState(null);
-  const [viewIndex, setViewIndex] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
   const [error, setError] = useState(null);
+  const bookRef = useRef(null);
+  const isMobile = useMobile(768);
 
   useEffect(() => {
     let cancelled = false;
@@ -165,59 +50,101 @@ export default function ViewAlbum() {
       .catch(() => setCoverImageUrl(null));
   }, [album?.cover_id, album?.cover_config?.coverUrl]);
 
+  const onFlip = useCallback((e) => {
+    setCurrentPage(e.data);
+  }, []);
+
   if (error) {
     return (
       <div className={styles.page}>
-        <div className={styles.center}>
+        <div className={styles.center} style={{ flexDirection: "column", gap: "1rem" }}>
           <p className={styles.error}>{error}</p>
-          <Link to="/">לדף הבית</Link>
+          <Link to="/" className={styles.secondary}>
+            לדף הבית
+          </Link>
         </div>
       </div>
     );
   }
 
-  if (!album) return <div className={styles.center}><span className={styles.spinner} /></div>;
+  if (!album) {
+    return (
+      <div className={styles.page}>
+        <AlbumLoading label="טוען את האלבום..." />
+      </div>
+    );
+  }
 
   const pages = album.pages || [];
-  const spreadCount = Math.max(1, Math.ceil(pages.length / 2));
-  const viewCount = 1 + spreadCount;
-  const currentSpreadIndex = viewIndex === 0 ? 0 : viewIndex - 1;
-  const leftPage = pages[currentSpreadIndex * 2] || null;
-  const rightPage = pages[currentSpreadIndex * 2 + 1] || null;
   const coverUrl = coverImageUrl ?? album?.cover_config?.coverUrl ?? null;
+  const totalFlipPages = 1 + pages.length + 1;
+  const pageLabels = ["כריכה", ...pages.map((_, i) => `עמוד ${i + 1}`), "כריכה אחורית"];
+
+  const bookPages = [
+    <CoverPage key="cover" album={album} coverUrl={coverUrl} />,
+    ...pages.map((page, i) => (
+      <SinglePage
+        key={i}
+        page={page}
+        getPhotoUrl={getPhotoUrl}
+        getElementUrl={getElementUrl}
+      />
+    )),
+    <BackCoverPage key="back" coverUrl={coverUrl} />,
+  ];
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
         <h1>צפייה באלבום</h1>
-        <p className={styles.sub}>אלבום משותף – עיינו בעמודים</p>
       </header>
 
-      <div className={styles.albumModel}>
-        <div className={styles.viewNav}>
-          <button type="button" className={styles.navBtn} onClick={() => setViewIndex((i) => Math.max(0, i - 1))} disabled={viewIndex === 0}>
+      <div className={styles.bookWrap}>
+        <div className={styles.bookFrame}>
+          <div className={styles.bookContainer}>
+            <HTMLFlipBook
+              ref={bookRef}
+              width={isMobile ? BOOK_WIDTH_MOBILE : BOOK_WIDTH_DESKTOP}
+              height={isMobile ? BOOK_HEIGHT_MOBILE : BOOK_HEIGHT_DESKTOP}
+              size="fixed"
+              showCover={true}
+              drawShadow={true}
+              flippingTime={600}
+              usePortrait={true}
+              startZIndex={0}
+              useMouseEvents={false}
+              swipeDistance={0}
+              onFlip={onFlip}
+              key={isMobile ? "mobile" : "desktop"}
+            >
+              {bookPages}
+            </HTMLFlipBook>
+          </div>
+        </div>
+
+        <div className={styles.navWrap}>
+          <button
+            type="button"
+            className={styles.navBtn}
+            onClick={() => bookRef.current?.pageFlip()?.flipPrev()}
+            disabled={currentPage <= 0}
+            aria-label="עמוד קודם"
+          >
             ‹
           </button>
           <span className={styles.viewLabel}>
-            {viewIndex === 0 ? "כריכה" : rightPage ? `עמודים ${currentSpreadIndex * 2 + 1}–${currentSpreadIndex * 2 + 2}` : `עמוד ${currentSpreadIndex * 2 + 1}`}
+            {pageLabels[currentPage] ?? ""}
           </span>
-          <button type="button" className={styles.navBtn} onClick={() => setViewIndex((i) => Math.min(viewCount - 1, i + 1))} disabled={viewIndex >= viewCount - 1}>
+          <button
+            type="button"
+            className={styles.navBtn}
+            onClick={() => bookRef.current?.pageFlip()?.flipNext()}
+            disabled={currentPage >= totalFlipPages - 1}
+            aria-label="עמוד הבא"
+          >
             ›
           </button>
         </div>
-        <div className={styles.albumView}>
-          {viewIndex === 0 ? (
-            <CoverDisplay album={album} coverUrl={coverUrl} />
-          ) : (
-            <SpreadDisplay leftPage={leftPage} rightPage={rightPage} getPhotoUrl={getPhotoUrl} getElementUrl={getElementUrl} />
-          )}
-        </div>
-      </div>
-
-      <div className={styles.actions} style={{ marginTop: "1.5rem" }}>
-        <Link to="/" className={styles.secondary} style={{ padding: "0.6rem 1rem", borderRadius: "var(--radius)", border: "1px solid var(--surface2)", background: "var(--surface)", fontSize: "0.95rem", textDecoration: "none", color: "inherit" }}>
-          לדף הבית
-        </Link>
       </div>
     </div>
   );

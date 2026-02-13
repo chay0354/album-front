@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { getAlbum, updateAlbum, getPdfDownloadUrl } from "../api";
 import StageIndicator from "../components/StageIndicator";
+import AlbumLoading from "../components/AlbumLoading";
 import styles from "./Done.module.css";
 
 function ensureShareToken(album) {
@@ -46,6 +47,8 @@ export default function Done() {
     if (album?.share_token && !shareUrl)
       setShareUrl(`${window.location.origin}/view/${album.share_token}`);
   }, [album?.share_token, shareUrl]);
+
+  if (!album) return <AlbumLoading />;
 
   return (
     <div className={styles.page}>

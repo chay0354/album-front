@@ -16,6 +16,7 @@ import {
   getElementUrl,
 } from "../api";
 import StageIndicator from "../components/StageIndicator";
+import AlbumLoading from "../components/AlbumLoading";
 import styles from "./EditPages.module.css";
 
 const DEFAULT_LAYOUT = (index) => {
@@ -137,6 +138,40 @@ function PagePhotos({ photos, getPhotoUrl, onRemove, useLayout, showRemoveButton
 const DEFAULT_PAGE_BG = "#ffffff";
 const DEFAULT_PAGE_TEXT_COLOR = "#000000";
 
+const MIN_FONT = 14;
+const MAX_FONT = 52;
+const DEFAULT_TEXT_X = 50;
+const DEFAULT_TEXT_Y = 25;
+const DEFAULT_TEXT_FONT_SIZE = 28;
+const DEFAULT_TEXT_COLOR = "#000000";
+
+function isValidHex(s) {
+  return /^#[0-9A-Fa-f]{6}$/.test(s);
+}
+
+function newPageText(overrides = {}) {
+  return {
+    id: "pt" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
+    content: "",
+    x: DEFAULT_TEXT_X,
+    y: DEFAULT_TEXT_Y,
+    fontSize: DEFAULT_TEXT_FONT_SIZE,
+    color: DEFAULT_TEXT_COLOR,
+    ...overrides,
+  };
+}
+
+function loadTextsFromPageConfig(cfg) {
+  if (cfg.texts && Array.isArray(cfg.texts) && cfg.texts.length > 0) {
+    return cfg.texts.map((t, i) => ({
+      ...t,
+      id: t.id || "pt-" + i + "-" + Math.random().toString(36).slice(2, 8),
+      color: t.color || DEFAULT_TEXT_COLOR,
+    }));
+  }
+  return [];
+}
+
 function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, onSave, onClose, onSaveError, onUploadToPage, onRemovePhoto }) {
   const containerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -147,6 +182,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     backgroundColor: cfg.backgroundColor ?? DEFAULT_PAGE_BG,
     textColor: cfg.textColor ?? DEFAULT_PAGE_TEXT_COLOR,
     stickers: Array.isArray(cfg.stickers) ? cfg.stickers : [],
+    texts: loadTextsFromPageConfig(cfg),
   });
   const [layouts, setLayouts] = useState(() => {
     const next = {};
@@ -172,7 +208,40 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
   const [resizingId, setResizingId] = useState(null);
   const resizeStickerRef = useRef({ stickerId: null, handle: null, startLayout: null });
   const [resizingStickerId, setResizingStickerId] = useState(null);
+  const [selectedTextId, setSelectedTextId] = useState(null);
+  const [draggingTextId, setDraggingTextId] = useState(null);
+  const [showCropPanel, setShowCropPanel] = useState(false);
+  const textDragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+  const contentInputRef = useRef(null);
+  const lastTextTapRef = useRef({ id: null, time: 0 });
+  const [guideLines, setGuideLines] = useState({ vertical: [], horizontal: [] });
+  const layoutsRef = useRef(layouts);
   const MIN_SIZE = 8;
+  const SNAP_THRESHOLD = 2.5;
+  const DOUBLE_TAP_MS = 400;
+  const DEFAULT_CROP = { l: 0, t: 0, w: 100, h: 100 };
+  const getCrop = (layout) => layout?.crop && typeof layout.crop.w === "number" ? layout.crop : null;
+  const applyCrop = (layout, imgSrc) => {
+    const crop = getCrop(layout) || DEFAULT_CROP;
+    const hasCrop = crop.l > 0 || crop.t > 0 || crop.w < 100 || crop.h < 100;
+    if (!hasCrop) return <img src={imgSrc} alt="" draggable={false} />;
+    return (
+      <div className={styles.editorPhotoCropWrap}>
+        <img
+          src={imgSrc}
+          alt=""
+          draggable={false}
+          className={styles.editorPhotoCroppedImg}
+          style={{
+            width: `${(100 / crop.w) * 100}%`,
+            height: `${(100 / crop.h) * 100}%`,
+            left: `${-(crop.l / crop.w) * 100}%`,
+            top: `${-(crop.t / crop.h) * 100}%`,
+          }}
+        />
+      </div>
+    );
+  };
   const MIN_STICKER_SIZE = 3;
   const MAX_XY = 100;
 
@@ -187,6 +256,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       backgroundColor: cfg.backgroundColor ?? prev.backgroundColor ?? DEFAULT_PAGE_BG,
       textColor: cfg.textColor ?? prev.textColor ?? DEFAULT_PAGE_TEXT_COLOR,
       stickers: Array.isArray(cfg.stickers) ? cfg.stickers : [],
+      texts: loadTextsFromPageConfig(cfg),
     }));
   }, [page?.id, page?.page_config]);
 
@@ -201,6 +271,10 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       return next;
     });
   }, [photos]);
+
+  useEffect(() => {
+    layoutsRef.current = layouts;
+  }, [layouts]);
 
   useEffect(() => {
     const pending = slotUploadingForRef.current;
@@ -262,15 +336,88 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       const dx = ((x - ref.startX) / rect.width) * 100;
       const dy = ((y - ref.startY) / rect.height) * 100;
       if (ref.type === "photo") {
-        setLayouts((prev) => {
-          const l = prev[ref.id] || ref.startLayout;
-          if (!l || typeof l.x !== "number") return prev;
-          let newX = ref.startLayout.x + dx;
-          let newY = ref.startLayout.y + dy;
-          newX = Math.max(0, Math.min(100 - l.w, newX));
-          newY = Math.max(0, Math.min(100 - l.h, newY));
-          return { ...prev, [ref.id]: { ...l, x: newX, y: newY } };
+        const currentLayouts = layoutsRef.current;
+        const l = currentLayouts[ref.id] || ref.startLayout;
+        if (!l || typeof l.x !== "number") return;
+        let newX = ref.startLayout.x + dx;
+        let newY = ref.startLayout.y + dy;
+        newX = Math.max(0, Math.min(100 - l.w, newX));
+        newY = Math.max(0, Math.min(100 - l.h, newY));
+        const guides = { vertical: [], horizontal: [] };
+        const otherIds = (photos || []).filter((p) => p.id !== ref.id).map((p) => p.id);
+        const vTargets = [0, 50, 100];
+        const hTargets = [0, 50, 100];
+        otherIds.forEach((id) => {
+          const o = currentLayouts[id];
+          if (o && typeof o.x === "number") {
+            vTargets.push(o.x, o.x + (o.w || 0) / 2, o.x + (o.w || 0));
+            hTargets.push(o.y, o.y + (o.h || 0) / 2, o.y + (o.h || 0));
+          }
         });
+        const dragLeft = newX;
+        const dragCenterX = newX + (l.w || 0) / 2;
+        const dragRight = newX + (l.w || 0);
+        const dragTop = newY;
+        const dragCenterY = newY + (l.h || 0) / 2;
+        const dragBottom = newY + (l.h || 0);
+        let bestV = null;
+        let bestVAnchor = 0;
+        let bestVDist = SNAP_THRESHOLD;
+        vTargets.forEach((t) => {
+          const dLeft = Math.abs(dragLeft - t);
+          const dCenter = Math.abs(dragCenterX - t);
+          const dRight = Math.abs(dragRight - t);
+          if (dLeft < bestVDist) {
+            bestVDist = dLeft;
+            bestV = t;
+            bestVAnchor = 0;
+          }
+          if (dCenter < bestVDist) {
+            bestVDist = dCenter;
+            bestV = t;
+            bestVAnchor = 1;
+          }
+          if (dRight < bestVDist) {
+            bestVDist = dRight;
+            bestV = t;
+            bestVAnchor = 2;
+          }
+        });
+        let bestH = null;
+        let bestHAnchor = 0;
+        let bestHDist = SNAP_THRESHOLD;
+        hTargets.forEach((t) => {
+          const dTop = Math.abs(dragTop - t);
+          const dCenter = Math.abs(dragCenterY - t);
+          const dBottom = Math.abs(dragBottom - t);
+          if (dTop < bestHDist) {
+            bestHDist = dTop;
+            bestH = t;
+            bestHAnchor = 0;
+          }
+          if (dCenter < bestHDist) {
+            bestHDist = dCenter;
+            bestH = t;
+            bestHAnchor = 1;
+          }
+          if (dBottom < bestHDist) {
+            bestHDist = dBottom;
+            bestH = t;
+            bestHAnchor = 2;
+          }
+        });
+        if (bestV != null) {
+          guides.vertical.push(bestV);
+          const offset = bestVAnchor === 0 ? 0 : bestVAnchor === 1 ? (l.w || 0) / 2 : l.w || 0;
+          newX = Math.max(0, Math.min(100 - (l.w || 0), bestV - offset));
+        }
+        if (bestH != null) {
+          guides.horizontal.push(bestH);
+          const offset = bestHAnchor === 0 ? 0 : bestHAnchor === 1 ? (l.h || 0) / 2 : l.h || 0;
+          newY = Math.max(0, Math.min(100 - (l.h || 0), bestH - offset));
+        }
+        setGuideLines(guides);
+        setLayouts((prev) => ({ ...prev, [ref.id]: { ...(prev[ref.id] || ref.startLayout), x: newX, y: newY } }));
       } else {
         setPageConfig((prev) => ({
           ...prev,
@@ -293,6 +440,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       }
       setDraggingId(null);
       setDraggingStickerId(null);
+      setGuideLines({ vertical: [], horizontal: [] });
       dragRef.current.id = null;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -304,7 +452,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     window.addEventListener("mouseup", onUp);
     window.addEventListener("touchmove", onMove, opts);
     window.addEventListener("touchend", onUp);
-  }, [layouts, getCoords]);
+  }, [layouts, getCoords, photos]);
 
   const handleStickerMouseDown = useCallback((e, sticker) => {
     e.preventDefault();
@@ -364,6 +512,101 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     window.addEventListener("touchmove", onMove, opts);
     window.addEventListener("touchend", onUp);
   }, [getCoords]);
+
+  const updatePageText = useCallback((id, updates) => {
+    setPageConfig((prev) => ({
+      ...prev,
+      texts: (prev.texts || []).map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    }));
+  }, []);
+
+  const addPageText = useCallback(() => {
+    const t = newPageText();
+    setPageConfig((prev) => ({ ...prev, texts: [...(prev.texts || []), t] }));
+    setSelectedTextId(t.id);
+    setSelectedId(null);
+    setSelectedStickerId(null);
+  }, []);
+
+  const removePageText = useCallback((id) => {
+    setPageConfig((prev) => ({ ...prev, texts: (prev.texts || []).filter((t) => t.id !== id) }));
+    if (selectedTextId === id) setSelectedTextId(null);
+  }, [selectedTextId]);
+
+  const handleTextDoubleClick = useCallback((e, textId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedTextId(textId);
+    setSelectedId(null);
+    setSelectedStickerId(null);
+    setTimeout(() => contentInputRef.current?.focus(), 150);
+  }, []);
+
+  const handleTextTap = useCallback((textId) => {
+    const now = Date.now();
+    const last = lastTextTapRef.current;
+    if (last.id === textId && now - last.time < DOUBLE_TAP_MS) {
+      lastTextTapRef.current = { id: null, time: 0 };
+      setSelectedTextId(textId);
+      setSelectedId(null);
+      setSelectedStickerId(null);
+      setTimeout(() => contentInputRef.current?.focus(), 150);
+      return true;
+    }
+    lastTextTapRef.current = { id: textId, time: now };
+    return false;
+  }, []);
+
+  const handleTextPointerDown = useCallback((e, textId) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const texts = pageConfig.texts || [];
+    const t = texts.find((x) => x.id === textId);
+    if (!t) return;
+    setSelectedTextId(textId);
+    setSelectedId(null);
+    setSelectedStickerId(null);
+    const { x, y } = getCoords(e);
+    const ref = { textId, x: t.x, y: t.y, startX: x, startY: y, dragStarted: false };
+    textDragStartRef.current = ref;
+    const wrap = containerRef.current;
+    const onMove = (ev) => {
+      ev.preventDefault();
+      const r = textDragStartRef.current;
+      if (!r || r.textId !== textId) return;
+      const rect = wrap?.getBoundingClientRect();
+      if (!rect) return;
+      const pos = getCoords(ev);
+      const dist = Math.hypot(pos.x - r.startX, pos.y - r.startY);
+      if (!r.dragStarted && dist > 5) {
+        r.dragStarted = true;
+        setDraggingTextId(textId);
+      }
+      if (r.dragStarted) {
+        const dx = ((pos.x - r.startX) / rect.width) * 100;
+        const dy = ((pos.y - r.startY) / rect.height) * 100;
+        updatePageText(textId, {
+          x: Math.max(0, Math.min(100, r.x + dx)),
+          y: Math.max(0, Math.min(100, r.y + dy)),
+        });
+      }
+    };
+    const onUp = () => {
+      const r = textDragStartRef.current;
+      if (r && !r.dragStarted) handleTextTap(r.textId);
+      textDragStartRef.current = null;
+      setDraggingTextId(null);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    };
+    const opts = { passive: false };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, opts);
+    window.addEventListener("touchend", onUp);
+  }, [pageConfig.texts, getCoords, updatePageText, handleTextTap]);
 
   const handleResizeStart = useCallback((e, photoId, handle) => {
     e.preventDefault();
@@ -535,8 +778,14 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       for (const p of photos || []) {
         if (layouts[p.id]) await updatePhotoLayout(albumId, p.id, layouts[p.id]);
       }
-      if (page?.id) await updatePageConfig(albumId, page.id, pageConfig);
-      await onSave();
+      const configToSave = {
+        ...pageConfig,
+        texts: (pageConfig.texts || [])
+          .filter((t) => (t.content || "").trim() !== "")
+          .map(({ id: _id, ...t }) => t),
+      };
+      const updated = page?.id ? await updatePageConfig(albumId, page.id, configToSave) : null;
+      await onSave(updated);
       onClose();
     } catch (err) {
       onSaveError?.(err?.message || "שגיאה בשמירה");
@@ -553,6 +802,9 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     : null;
   const selectedSticker = selectedStickerId
     ? (pageConfig.stickers || []).find((s) => s.id === selectedStickerId)
+    : null;
+  const selectedPageText = selectedTextId
+    ? (pageConfig.texts || []).find((t) => t.id === selectedTextId)
     : null;
 
   function updateLayout(photoId, updates) {
@@ -600,7 +852,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
   }
 
   return (
-    <div className={styles.fullScreenOverlay} onClick={(e) => { if (e.target === e.currentTarget) { setSelectedId(null); setSelectedStickerId(null); } }}>
+    <div className={styles.fullScreenOverlay} onClick={(e) => { if (e.target === e.currentTarget) { setSelectedId(null); setSelectedStickerId(null); setSelectedTextId(null); setShowCropPanel(false); } }}>
       <div className={styles.fullScreenContent} onClick={(e) => e.stopPropagation()}>
         <div className={styles.fullScreenHeader}>
           <h2>עריכת מיקומים – {pageLabel}</h2>
@@ -609,17 +861,30 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
             <button type="button" className={styles.cta} onClick={handleSave} disabled={saving}>{saving ? "שומר..." : "שמור"}</button>
           </div>
         </div>
-        <p className={styles.fullScreenHint}>גרור תמונה להזזה. בחר תמונה – יופיעו ידיות לפינה לגודל וכלי כיוונון על התמונה.</p>
+        <p className={styles.fullScreenHint}>גרור את התמונה כדי להזיז אותה, לחץ עליה לחיצה אחת כדי להגדיל או להקטין אותה</p>
         <div className={styles.editorLayout}>
           <div className={styles.fullScreenPageWrap} ref={containerRef}>
             <div
               className={styles.fullScreenPage}
-              onClick={() => { setSelectedId(null); setSelectedStickerId(null); setSelectedSlotForPicker(null); }}
+              onClick={() => { setSelectedId(null); setSelectedStickerId(null); setSelectedTextId(null); setSelectedSlotForPicker(null); setShowCropPanel(false); }}
               style={{
                 background: pageConfig.backgroundColor,
                 backgroundColor: pageConfig.backgroundColor,
               }}
             >
+              {!templateSlots && (
+                <div className={styles.editorGridOverlay} aria-hidden />
+              )}
+              {(guideLines.vertical.length > 0 || guideLines.horizontal.length > 0) && (
+                <div className={styles.editorGuideLines} aria-hidden>
+                  {guideLines.vertical.map((x) => (
+                    <div key={`v-${x}`} className={styles.editorGuideLineV} style={{ left: `${x}%` }} />
+                  ))}
+                  {guideLines.horizontal.map((y) => (
+                    <div key={`h-${y}`} className={styles.editorGuideLineH} style={{ top: `${y}%` }} />
+                  ))}
+                </div>
+              )}
               {templateSlots ? (
                 <>
                   {templateSlots.map((slot, i) => {
@@ -650,7 +915,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                           onTouchStart={(e) => !resizingId && handleMouseDown(e, p.id)}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <img src={getPhotoUrl(p.storage_path)} alt="" draggable={false} />
+                          {applyCrop(layouts[p.id] || slotLayout, getPhotoUrl(p.storage_path))}
                           {selectedId === photoId && selectedLayout && (
                             <>
                               {["nw", "ne", "sw", "se"].map((h) => (
@@ -664,6 +929,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                                 />
                               ))}
                               <div className={styles.editorPhotoControls}>
+                                <button type="button" className={styles.editorPhotoRemoveBtn} onClick={(ev) => { ev.stopPropagation(); setShowCropPanel((v) => !v); }}>חתוך תמונה</button>
                                 {templateSlots && slotPhotoIds.includes(p.id) ? (
                                   <button type="button" className={styles.editorPhotoRemoveBtn} onClick={(ev) => { ev.stopPropagation(); const idx = slotPhotoIds.indexOf(p.id); if (idx >= 0) unassignPhotoFromSlot(idx); setSelectedId(null); }}>הסר מהמקום</button>
                                 ) : onRemovePhoto ? (
@@ -738,7 +1004,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                       onTouchStart={(e) => !resizingId && handleMouseDown(e, p.id)}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <img src={getPhotoUrl(p.storage_path)} alt="" draggable={false} />
+                      {applyCrop(layouts[p.id] || DEFAULT_LAYOUT(0), getPhotoUrl(p.storage_path))}
                       {selectedId === p.id && selectedLayout && (
                         <>
                           {["nw", "ne", "sw", "se"].map((h) => (
@@ -752,6 +1018,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                             />
                           ))}
                           <div className={styles.editorPhotoControls}>
+                            <button type="button" className={styles.editorPhotoRemoveBtn} onClick={(ev) => { ev.stopPropagation(); setShowCropPanel((v) => !v); }}>חתוך תמונה</button>
                             {onRemovePhoto && (
                               <button type="button" className={styles.editorPhotoRemoveBtn} onClick={(ev) => { ev.stopPropagation(); handleRemovePhoto(); }}>הסר</button>
                             )}
@@ -761,6 +1028,35 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                     </div>
                   );
                 })
+              )}
+              {selectedId && showCropPanel && selectedLayout && (
+                <div className={styles.cropPanel} onClick={(e) => e.stopPropagation()}>
+                  <h4 className={styles.cropPanelTitle}>חיתוך תמונה</h4>
+                  {(["l", "t", "w", "h"]).map((key) => (
+                    <label key={key} className={styles.cropPanelRow}>
+                      <span className={styles.cropPanelLabel}>{key === "l" ? "שמאל %" : key === "t" ? "למעלה %" : key === "w" ? "רוחב %" : "גובה %"}</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={Math.round((getCrop(selectedLayout) || DEFAULT_CROP)[key])}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          const cur = getCrop(selectedLayout) || DEFAULT_CROP;
+                          const crop = { ...cur, [key]: val };
+                          if (key === "l") crop.w = Math.min(crop.w, 100 - val);
+                          else if (key === "t") crop.h = Math.min(crop.h, 100 - val);
+                          else if (key === "w") crop.w = Math.min(100 - crop.l, Math.max(1, val));
+                          else if (key === "h") crop.h = Math.min(100 - crop.t, Math.max(1, val));
+                          updateLayout(selectedId, { crop });
+                        }}
+                        className={styles.cropPanelSlider}
+                      />
+                      <span className={styles.cropPanelValue}>{Math.round((getCrop(selectedLayout) || DEFAULT_CROP)[key])}</span>
+                    </label>
+                  ))}
+                  <button type="button" className={styles.secondary} onClick={() => setShowCropPanel(false)}>סגור</button>
+                </div>
               )}
               {(pageConfig.stickers || []).map((sticker) => {
                 if (!sticker.path) return null;
@@ -812,6 +1108,33 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                   </div>
                 );
               })}
+              {(pageConfig.texts || []).map((t) => (
+                <div
+                  key={t.id}
+                  className={
+                    styles.pageTextDisplay +
+                    (draggingTextId === t.id ? " " + styles.pageTextDragging : "") +
+                    (selectedTextId === t.id ? " " + styles.pageTextSelected : "")
+                  }
+                  style={{
+                    left: `${t.x}%`,
+                    top: `${t.y}%`,
+                    transform: "translate(-50%, -50%)",
+                    fontSize: `${t.fontSize}px`,
+                    color: isValidHex(t.color) ? t.color : DEFAULT_TEXT_COLOR,
+                  }}
+                  onMouseDown={(e) => handleTextPointerDown(e, t.id)}
+                  onTouchStart={(e) => handleTextPointerDown(e, t.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onDoubleClick={(e) => handleTextDoubleClick(e, t.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter") setSelectedTextId(t.id); }}
+                  aria-label="טקסט בעמוד – לחיצה כפולה לעריכת התוכן"
+                >
+                  <span className={styles.pageTextTitle}>{t.content.trim() || "טקסט"}</span>
+                </div>
+              ))}
             </div>
           </div>
           <div className={styles.editorControlsCol}>
@@ -873,7 +1196,63 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                   />
                   <span>{uploading ? "מעלה..." : "הוסף תמונות לעמוד"}</span>
                 </label>
+                <button type="button" className={styles.addPageTextBtn} onClick={addPageText}>
+                  הוסף טקסט לעמוד
+                </button>
+                <p className={styles.addPageTextHint}>ניתן להוסיף כמה טקסטים.</p>
               </>
+            )}
+            {selectedPageText && (
+              <div className={styles.pageTextEditorPanel}>
+                <h4 className={styles.pageTextEditorTitle}>עריכת טקסט</h4>
+                <div className={styles.pageTextEditorRow}>
+                  <label className={styles.pageTextEditorLabel}>תוכן</label>
+                  <input
+                    ref={contentInputRef}
+                    type="text"
+                    value={selectedPageText.content}
+                    onChange={(e) => updatePageText(selectedPageText.id, { content: e.target.value })}
+                    placeholder="הטקסט בעמוד"
+                    className={styles.pageTextEditorInput}
+                  />
+                </div>
+                <div className={styles.pageTextEditorRow}>
+                  <label className={styles.pageTextEditorLabel}>גודל</label>
+                  <div className={styles.pageTextSizeRow}>
+                    <input
+                      type="range"
+                      min={MIN_FONT}
+                      max={MAX_FONT}
+                      value={selectedPageText.fontSize}
+                      onChange={(e) => updatePageText(selectedPageText.id, { fontSize: Number(e.target.value) })}
+                      className={styles.pageTextSizeSlider}
+                    />
+                    <span className={styles.pageTextSizeValue}>{selectedPageText.fontSize}px</span>
+                  </div>
+                </div>
+                <div className={styles.pageTextEditorRow}>
+                  <label className={styles.pageTextEditorLabel}>צבע</label>
+                  <div className={styles.pageTextColorRow}>
+                    <input
+                      type="color"
+                      value={selectedPageText.color}
+                      onChange={(e) => updatePageText(selectedPageText.id, { color: e.target.value })}
+                      className={styles.pageTextColorInput}
+                      aria-label="בחר צבע"
+                    />
+                    <input
+                      type="text"
+                      value={selectedPageText.color}
+                      onChange={(e) => updatePageText(selectedPageText.id, { color: e.target.value.startsWith("#") ? e.target.value : "#" + e.target.value })}
+                      className={styles.pageTextColorHex}
+                      placeholder="#000000"
+                    />
+                  </div>
+                </div>
+                <button type="button" className={styles.deletePageTextBtn} onClick={() => removePageText(selectedPageText.id)}>
+                  מחק טקסט
+                </button>
+              </div>
             )}
             <div className={styles.stickerPicker}>
               <span className={styles.stickerPickerLabel}>אלמנטים מוכנים</span>
@@ -956,6 +1335,29 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
   );
 }
 
+function PageTexts({ texts }) {
+  if (!Array.isArray(texts) || texts.length === 0) return null;
+  return (
+    <div className={styles.halfPageTexts} aria-hidden>
+      {texts.map((t, i) => (
+        <div
+          key={t.id || i}
+          className={styles.halfPageText}
+          style={{
+            left: `${t.x ?? 50}%`,
+            top: `${t.y ?? 25}%`,
+            transform: "translate(-50%, -50%)",
+            fontSize: `${t.fontSize ?? 28}px`,
+            color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#000",
+          }}
+        >
+          {t.content}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PageStickers({ stickers, getElementUrl }) {
   if (!Array.isArray(stickers) || stickers.length === 0) return null;
   return (
@@ -1026,9 +1428,10 @@ function AlbumSpread({ leftPage, rightPage, albumId, onDrop, onRemove, onEditPag
             showRemoveButton={false}
           />
           {getElementUrl && <PageStickers stickers={stickersLeft} getElementUrl={getElementUrl} />}
+          <PageTexts texts={leftPage?.page_config?.texts} />
           {leftPage && (
             <button type="button" className={styles.editPageBtnOnPage} onClick={(e) => { e.stopPropagation(); onEditPage(leftPage); }} title="ערוך עמוד">
-              ערוך עמוד
+              לחץ כדי לערוך עמוד ולהוסיף תמונות
             </button>
           )}
         </div>
@@ -1051,9 +1454,10 @@ function AlbumSpread({ leftPage, rightPage, albumId, onDrop, onRemove, onEditPag
             showRemoveButton={false}
           />
           {getElementUrl && <PageStickers stickers={stickersRight} getElementUrl={getElementUrl} />}
+          <PageTexts texts={rightPage?.page_config?.texts} />
           {rightPage ? (
             <button type="button" className={styles.editPageBtnOnPage} onClick={(e) => { e.stopPropagation(); onEditPage(rightPage); }} title="ערוך עמוד">
-              ערוך עמוד
+              לחץ כדי לערוך עמוד ולהוסיף תמונות
             </button>
           ) : onAddPage ? (
             <button type="button" className={styles.editPageBtnOnPage} onClick={(e) => { e.stopPropagation(); onAddPage(); }} title="הוסף עמוד">
@@ -1110,7 +1514,15 @@ export default function EditPages() {
       .catch(() => setCoverImageUrl(null));
   }, [album?.cover_id, album?.cover_config?.coverUrl]);
 
-  async function refreshAlbum() {
+  async function refreshAlbum(updatedPageFromSave) {
+    if (updatedPageFromSave) {
+      setAlbum((prev) => ({
+        ...prev,
+        pages: (prev.pages || []).map((p) =>
+          p.id === updatedPageFromSave.id ? { ...p, page_config: updatedPageFromSave.page_config || p.page_config } : p
+        ),
+      }));
+    }
     const a = await getAlbum(id);
     setAlbum(a);
   }
@@ -1157,7 +1569,7 @@ export default function EditPages() {
     }
   }
 
-  if (!album) return <div className={styles.center}><span className={styles.spinner} /></div>;
+  if (!album) return <AlbumLoading />;
 
   return (
     <div className={styles.page}>

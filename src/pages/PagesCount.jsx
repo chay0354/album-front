@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAlbum, addPage, deletePage } from "../api";
 import StageIndicator from "../components/StageIndicator";
+import AlbumLoading from "../components/AlbumLoading";
 import styles from "./PagesCount.module.css";
 
 const MIN_PAGES = 1;
@@ -60,7 +61,7 @@ export default function PagesCount() {
     }
   }
 
-  if (!album) return <div className={styles.center}><span className={styles.spinner} /></div>;
+  if (!album) return <AlbumLoading />;
 
   return (
     <div className={styles.page}>

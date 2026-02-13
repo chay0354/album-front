@@ -26,7 +26,7 @@ export default function StageIndicator({ current }) {
           </div>
         ))}
       </div>
-      <p className={styles.currentLabel + (current === 4 ? " " + styles.currentLabelWhite : "")} aria-live="polite">
+      <p className={styles.currentLabel} aria-live="polite">
         שלב {current}: {STAGES.find((s) => s.num === current)?.label}
       </p>
     </div>
