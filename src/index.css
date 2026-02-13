@@ -78,6 +78,14 @@ a:hover {
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);
   }
+  /* Page content uses 95% of screen width on mobile */
+  main > * {
+    width: 95% !important;
+    max-width: none !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+  }
 }
 
 /* Touch-friendly: tap highlight */

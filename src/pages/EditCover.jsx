@@ -60,6 +60,7 @@ export default function EditCover() {
   const [userEmail, setUserEmail] = useState("");
   const [selectedPremadePath, setSelectedPremadePath] = useState(null);
   const [uploadedCoverUrl, setUploadedCoverUrl] = useState(null);
+  const [coverSearchQuery, setCoverSearchQuery] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -334,34 +335,61 @@ export default function EditCover() {
 
       <section className={styles.section}>
         <h3>בחר רקע כריכה</h3>
+        {premadeCovers.length > 0 && (
+          <div className={styles.coverSearchWrap}>
+            <input
+              type="search"
+              value={coverSearchQuery}
+              onChange={(e) => setCoverSearchQuery(e.target.value)}
+              placeholder="חפש כריכה לפי שם..."
+              className={styles.coverSearchInput}
+              aria-label="חיפוש כריכה לפי שם"
+            />
+          </div>
+        )}
         {premadeCovers.length === 0 && (
           <p className={styles.hint}>אין כריכות מוכנות. העלה תמונה למטה או הוסף כריכות ל־premade-covers.</p>
         )}
         <div className={styles.options} role="group" aria-label="בחר רקע כריכה">
-          {premadeCovers.map((c) => {
-            const url = getPremadeCoverUrl(c.path);
-            const isSelected = selectedPremadePath === c.path;
-            const path = c.path;
-            const name = c.name || (path && path.split("/").pop()?.replace(/\.[^.]+$/, "")) || path || "";
-            return (
-              <label
-                key={"premade-" + path}
-                className={styles.option + (isSelected ? " " + styles.selected : "")}
-                style={{ cursor: "pointer" }}
-              >
-                <input
-                  type="radio"
-                  name="cover-premade"
-                  value={path}
-                  checked={isSelected}
-                  onChange={() => path && handleSelectPremade(path)}
-                  className={styles.optionRadio}
-                />
-                <img src={url} alt={name || "כריכה"} />
-                {name ? <span className={styles.coverName}>{name}</span> : null}
-              </label>
-            );
-          })}
+          {(() => {
+            const getDisplayName = (c) =>
+              c.name || (c.path && c.path.split("/").pop()?.replace(/\.[^.]+$/, "")) || c.path || "";
+            const q = (coverSearchQuery || "").trim().toLowerCase();
+            const filtered = q
+              ? premadeCovers.filter((c) => getDisplayName(c).toLowerCase().includes(q))
+              : premadeCovers;
+            if (filtered.length === 0 && premadeCovers.length > 0) {
+              return (
+                <p className={styles.hint} style={{ width: "100%", marginBottom: 0 }}>
+                  לא נמצאו כריכות התואמות את החיפוש.
+                </p>
+              );
+            }
+            return filtered.map((c) => {
+              const url = getPremadeCoverUrl(c.path);
+              const isSelected = selectedPremadePath === c.path;
+              const path = c.path;
+              const name = getDisplayName(c);
+              return (
+                <label
+                  key={"premade-" + path}
+                  className={styles.option + (isSelected ? " " + styles.selected : "")}
+                  style={{ cursor: "pointer" }}
+                >
+                  <input
+                    type="radio"
+                    name="cover-premade"
+                    value={path}
+                    checked={isSelected}
+                    onChange={() => path && handleSelectPremade(path)}
+                    className={styles.optionRadio}
+                  />
+                  <img src={url} alt={name || "כריכה"} />
+                  {name ? <span className={styles.coverName}>{name}</span> : null}
+                </label>
+              );
+            });
+          })()}
           <>
             <input
               ref={coverUploadInputRef}

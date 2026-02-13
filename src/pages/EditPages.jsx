@@ -861,8 +861,8 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
             <button type="button" className={styles.cta} onClick={handleSave} disabled={saving}>{saving ? "שומר..." : "שמור"}</button>
           </div>
         </div>
-        <p className={styles.fullScreenHint}>גרור את התמונה כדי להזיז אותה, לחץ עליה לחיצה אחת כדי להגדיל או להקטין אותה</p>
         <div className={styles.editorLayout}>
+          <p className={styles.fullScreenHint}>גרור את התמונה כדי להזיז אותה, לחץ עליה לחיצה אחת כדי להגדיל או להקטין אותה</p>
           <div className={styles.fullScreenPageWrap} ref={containerRef}>
             <div
               className={styles.fullScreenPage}
@@ -1176,29 +1176,31 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                   style={{ display: "none" }}
                   aria-hidden
                 />
-                <label className={styles.addImageToPageBtn}>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => {
-                      const files = e.target.files;
-                      if (files?.length) {
-                        setUploading(true);
-                        onUploadToPage(Array.from(files), pageConfig).finally(() => {
-                          setUploading(false);
-                          e.target.value = "";
-                        });
-                      }
-                    }}
-                    hidden
-                  />
-                  <span>{uploading ? "מעלה..." : "הוסף תמונות לעמוד"}</span>
-                </label>
-                <button type="button" className={styles.addPageTextBtn} onClick={addPageText}>
-                  הוסף טקסט לעמוד
-                </button>
+                <div className={styles.addPageActionsRow}>
+                  <label className={styles.addImageToPageBtn}>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (files?.length) {
+                          setUploading(true);
+                          onUploadToPage(Array.from(files), pageConfig).finally(() => {
+                            setUploading(false);
+                            e.target.value = "";
+                          });
+                        }
+                      }}
+                      hidden
+                    />
+                    <span>{uploading ? "מעלה..." : "הוסף תמונות לעמוד"}</span>
+                  </label>
+                  <button type="button" className={styles.addPageTextBtn} onClick={addPageText}>
+                    הוסף טקסט לעמוד
+                  </button>
+                </div>
                 <p className={styles.addPageTextHint}>ניתן להוסיף כמה טקסטים.</p>
               </>
             )}
