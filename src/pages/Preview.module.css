@@ -1,0 +1,275 @@
+/* Stage 4: Interactive flip-book album */
+
+.page {
+  min-height: 100%;
+  padding: 1rem;
+  max-width: 900px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #2c2c2c 0%, #1a1a1a 100%);
+}
+
+.header {
+  text-align: center;
+  padding: 0 0 1rem;
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0;
+  color: #fff;
+}
+
+.sub {
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+}
+
+.bookWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  min-height: 420px;
+}
+
+.bookContainer {
+  box-shadow:
+    0 20px 60px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  overflow: visible;
+}
+
+@media (max-width: 480px) {
+  .bookContainer {
+    transform: scale(0.85);
+    transform-origin: top center;
+  }
+}
+
+/* Each flip-book page content */
+.flipPage {
+  width: 100%;
+  height: 100%;
+  background: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.flipPageCover {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: left center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+.flipPageCoverBack {
+  background-position: right center;
+}
+
+.flipPageCoverOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, transparent 45%);
+}
+
+.flipPageCoverText {
+  position: absolute;
+  color: #fff;
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flipPageSpread {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  padding: 4%;
+  box-sizing: border-box;
+}
+
+/* Mobile: one page at a time, full width */
+.flipPageSingle {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 4%;
+  box-sizing: border-box;
+}
+
+.flipPageSingle .flipHalf {
+  max-width: 100%;
+  flex: 1;
+  border-radius: 8px;
+}
+
+.flipHalf {
+  flex: 1;
+  min-width: 0;
+  max-width: 50%;
+  position: relative;
+  border-radius: 2px 8px 8px 2px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.flipHalf:last-child {
+  border-radius: 8px 2px 2px 8px;
+}
+
+.flipHalfPhotos {
+  position: absolute;
+  inset: 0;
+}
+
+.flipHalfPhoto {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flipHalfPhoto img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.flipHalfStickers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.flipHalfSticker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flipHalfSticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.navWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.navBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.navBtn:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.navBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.viewLabel {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.95rem;
+  min-width: 120px;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 1.5rem 0 0;
+}
+
+.secondary {
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: transparent;
+  color: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.cta {
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.cta:hover {
+  filter: brightness(1.1);
+}
+
+.center {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error {
+  color: #f87171;
+  margin: 1rem 0;
+}

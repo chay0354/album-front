@@ -665,20 +665,124 @@
 }
 
 .editorPhoto:hover {
-  border-color: var(--accent);
+  border-color: rgba(0, 0, 0, 0.35);
 }
 
 .editorPhoto:active,
 .editorPhotoDragging {
   cursor: grabbing;
-  border-color: var(--accent);
+  border-color: rgba(0, 0, 0, 0.45);
   z-index: 10;
 }
 
 .editorPhotoSelected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent);
+  border-color: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.2);
   z-index: 5;
+}
+
+.editorPhotoResizing {
+  pointer-events: none;
+}
+
+.editorPhotoResizing .editorResizeHandle,
+.editorPhotoResizing .editorPhotoControls {
+  pointer-events: auto;
+}
+
+.editorResizeHandle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid #fff;
+  border-radius: 2px;
+  z-index: 6;
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.editorResizeHandle[data-handle="nw"] {
+  top: 0;
+  left: 0;
+  margin: -3px 0 0 -3px;
+  cursor: nwse-resize;
+}
+
+.editorResizeHandle[data-handle="ne"] {
+  top: 0;
+  right: 0;
+  margin: -3px -3px 0 0;
+  cursor: nesw-resize;
+}
+
+.editorResizeHandle[data-handle="sw"] {
+  bottom: 0;
+  left: 0;
+  margin: 0 0 -3px -3px;
+  cursor: nesw-resize;
+}
+
+.editorResizeHandle[data-handle="se"] {
+  bottom: 0;
+  right: 0;
+  margin: 0 -3px -3px 0;
+  cursor: nwse-resize;
+}
+
+.editorPhotoControls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.75);
+  border-radius: 0 0 4px 4px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  z-index: 5;
+}
+
+.editorPhotoControlRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: #fff;
+  cursor: default;
+}
+
+.editorPhotoControlRow span:first-child {
+  min-width: 32px;
+}
+
+.editorPhotoSlider {
+  width: 56px;
+  height: 6px;
+  accent-color: var(--accent);
+}
+
+.editorPhotoValue {
+  min-width: 28px;
+  font-size: 0.7rem;
+  opacity: 0.9;
+}
+
+.editorPhotoRemoveBtn {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.15);
+  color: #fff;
+  cursor: pointer;
+  margin-right: auto;
+}
+
+.editorPhotoRemoveBtn:hover {
+  background: rgba(255,255,255,0.25);
 }
 
 .editorPhoto img {
@@ -703,7 +807,16 @@
 }
 
 .editorSticker:hover {
-  border-color: var(--accent);
+  border-color: rgba(0, 0, 0, 0.35);
+}
+
+.editorSticker.editorPhotoResizing {
+  pointer-events: none;
+}
+
+.editorSticker.editorPhotoResizing .editorResizeHandle,
+.editorSticker.editorPhotoResizing .editorPhotoControls {
+  pointer-events: auto;
 }
 
 .editorSticker .stickerImg {

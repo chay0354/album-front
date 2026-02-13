@@ -1,0 +1,146 @@
+.page {
+  padding: 2rem;
+  max-width: 640px;
+  margin: 1.5rem auto;
+  background: #e8e8e8;
+  border-radius: 24px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.1),
+    0 16px 48px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--surface2, #d0d0d0);
+  overflow: hidden;
+}
+
+.center {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--surface2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.header {
+  text-align: center;
+  padding: 0 0 1.5rem;
+}
+
+.header h1 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+}
+
+.sub {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.presetBtn {
+  width: 3rem;
+  height: 3rem;
+  border-radius: var(--radius);
+  border: 2px solid var(--surface2);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.presetBtn:hover {
+  border-color: var(--accent-soft);
+}
+
+.presetBtn.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.customRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.customLabel {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.customInput {
+  width: 5rem;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2);
+  font-size: 1rem;
+}
+
+.summary {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+.error {
+  color: var(--error);
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.secondary {
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2);
+  background: var(--surface);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.cta {
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.cta:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}

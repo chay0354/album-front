@@ -58,6 +58,49 @@
   text-decoration: none;
 }
 
+.shareSection {
+  text-align: right;
+  margin: 1.5rem 0;
+  padding: 1rem 0;
+  border-top: 1px solid var(--surface2);
+}
+
+.shareLabel {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
+.shareRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.shareInput {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--surface2);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  direction: ltr;
+  text-align: left;
+}
+
+.copyBtn {
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2);
+  background: var(--surface);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.copyBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .links {
   display: flex;
   flex-direction: column;

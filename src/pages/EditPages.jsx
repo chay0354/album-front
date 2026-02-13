@@ -15,6 +15,7 @@ import {
   getElementsList,
   getElementUrl,
 } from "../api";
+import StageIndicator from "../components/StageIndicator";
 import styles from "./EditPages.module.css";
 
 const DEFAULT_LAYOUT = (index) => {
@@ -167,6 +168,13 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
   const [selectedSlotForPicker, setSelectedSlotForPicker] = useState(null);
   const [slotIndexForNextUpload, setSlotIndexForNextUpload] = useState(null);
   const dragRef = useRef({ type: "photo", id: null, startX: 0, startY: 0, startLayout: null, dragStarted: false });
+  const resizeRef = useRef({ photoId: null, handle: null, startLayout: null });
+  const [resizingId, setResizingId] = useState(null);
+  const resizeStickerRef = useRef({ stickerId: null, handle: null, startLayout: null });
+  const [resizingStickerId, setResizingStickerId] = useState(null);
+  const MIN_SIZE = 8;
+  const MIN_STICKER_SIZE = 3;
+  const MAX_XY = 100;
 
   useEffect(() => {
     getElementsList().then(setElementsList).catch(() => setElementsList([]));
@@ -357,6 +365,136 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     window.addEventListener("touchend", onUp);
   }, [getCoords]);
 
+  const handleResizeStart = useCallback((e, photoId, handle) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const layout = layouts[photoId];
+    if (!layout || typeof layout.x !== "number") return;
+    setResizingId(photoId);
+    resizeRef.current = { photoId, handle, startLayout: { ...layout } };
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const toPct = (clientX, clientY) => ({
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 100,
+    });
+    const onMove = (ev) => {
+      ev.preventDefault();
+      const ref = resizeRef.current;
+      if (!ref.photoId || !ref.handle) return;
+      const { x: pctX, y: pctY } = toPct(getCoords(ev).x, getCoords(ev).y);
+      const l = ref.startLayout;
+      let newX = l.x, newY = l.y, newW = l.w, newH = l.h;
+      switch (ref.handle) {
+        case "se":
+          newW = Math.max(MIN_SIZE, Math.min(MAX_XY - l.x, pctX - l.x));
+          newH = Math.max(MIN_SIZE, Math.min(MAX_XY - l.y, pctY - l.y));
+          break;
+        case "sw":
+          newX = Math.max(0, Math.min(l.x + l.w - MIN_SIZE, pctX));
+          newW = l.x + l.w - newX;
+          newH = Math.max(MIN_SIZE, Math.min(MAX_XY - l.y, pctY - l.y));
+          break;
+        case "ne":
+          newW = Math.max(MIN_SIZE, Math.min(MAX_XY - l.x, pctX - l.x));
+          newY = Math.max(0, Math.min(l.y + l.h - MIN_SIZE, pctY));
+          newH = l.y + l.h - newY;
+          break;
+        case "nw":
+          newX = Math.max(0, Math.min(l.x + l.w - MIN_SIZE, pctX));
+          newY = Math.max(0, Math.min(l.y + l.h - MIN_SIZE, pctY));
+          newW = l.x + l.w - newX;
+          newH = l.y + l.h - newY;
+          break;
+        default:
+          return;
+      }
+      setLayouts((prev) => ({ ...prev, [ref.photoId]: { ...prev[ref.photoId], x: newX, y: newY, w: newW, h: newH } }));
+    };
+    const onUp = () => {
+      setResizingId(null);
+      resizeRef.current = { photoId: null, handle: null, startLayout: null };
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    };
+    const opts = { passive: false };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, opts);
+    window.addEventListener("touchend", onUp);
+  }, [layouts, getCoords]);
+
+  const handleStickerResizeStart = useCallback((e, stickerId, handle) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const sticker = (pageConfig.stickers || []).find((s) => s.id === stickerId);
+    if (!sticker || typeof sticker.x !== "number") return;
+    const layout = { x: sticker.x ?? 10, y: sticker.y ?? 10, w: sticker.w ?? STICKER_DEFAULT_SIZE, h: sticker.h ?? STICKER_DEFAULT_SIZE };
+    setResizingStickerId(stickerId);
+    resizeStickerRef.current = { stickerId, handle, startLayout: { ...layout } };
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const toPct = (clientX, clientY) => ({
+      x: ((clientX - rect.left) / rect.width) * 100,
+      y: ((clientY - rect.top) / rect.height) * 100,
+    });
+    const onMove = (ev) => {
+      ev.preventDefault();
+      const ref = resizeStickerRef.current;
+      if (!ref.stickerId || !ref.handle) return;
+      const { x: pctX, y: pctY } = toPct(getCoords(ev).x, getCoords(ev).y);
+      const l = ref.startLayout;
+      let newX = l.x, newY = l.y, newW = l.w, newH = l.h;
+      switch (ref.handle) {
+        case "se":
+          newW = Math.max(MIN_STICKER_SIZE, Math.min(MAX_XY - l.x, pctX - l.x));
+          newH = Math.max(MIN_STICKER_SIZE, Math.min(MAX_XY - l.y, pctY - l.y));
+          break;
+        case "sw":
+          newX = Math.max(0, Math.min(l.x + l.w - MIN_STICKER_SIZE, pctX));
+          newW = l.x + l.w - newX;
+          newH = Math.max(MIN_STICKER_SIZE, Math.min(MAX_XY - l.y, pctY - l.y));
+          break;
+        case "ne":
+          newW = Math.max(MIN_STICKER_SIZE, Math.min(MAX_XY - l.x, pctX - l.x));
+          newY = Math.max(0, Math.min(l.y + l.h - MIN_STICKER_SIZE, pctY));
+          newH = l.y + l.h - newY;
+          break;
+        case "nw":
+          newX = Math.max(0, Math.min(l.x + l.w - MIN_STICKER_SIZE, pctX));
+          newY = Math.max(0, Math.min(l.y + l.h - MIN_STICKER_SIZE, pctY));
+          newW = l.x + l.w - newX;
+          newH = l.y + l.h - newY;
+          break;
+        default:
+          return;
+      }
+      setPageConfig((prev) => ({
+        ...prev,
+        stickers: (prev.stickers || []).map((s) =>
+          s.id === ref.stickerId ? { ...s, x: newX, y: newY, w: newW, h: newH } : s
+        ),
+      }));
+    };
+    const onUp = () => {
+      setResizingStickerId(null);
+      resizeStickerRef.current = { stickerId: null, handle: null, startLayout: null };
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    };
+    const opts = { passive: false };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    window.addEventListener("touchmove", onMove, opts);
+    window.addEventListener("touchend", onUp);
+  }, [pageConfig.stickers, getCoords]);
+
   function addSticker(path) {
     if (!path) return;
     const id = "s-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
@@ -471,7 +609,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
             <button type="button" className={styles.cta} onClick={handleSave} disabled={saving}>{saving ? "שומר..." : "שמור"}</button>
           </div>
         </div>
-        <p className={styles.fullScreenHint}>גרור להזזה. בחר תמונה וכוון סיבוב וגודל בצד.</p>
+        <p className={styles.fullScreenHint}>גרור תמונה להזזה. בחר תמונה – יופיעו ידיות לפינה לגודל וכלי כיוונון על התמונה.</p>
         <div className={styles.editorLayout}>
           <div className={styles.fullScreenPageWrap} ref={containerRef}>
             <div
@@ -498,7 +636,8 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                           className={
                             styles.editorPhoto +
                             (draggingId === photoId ? " " + styles.editorPhotoDragging : "") +
-                            (selectedId === photoId ? " " + styles.editorPhotoSelected : "")
+                            (selectedId === photoId ? " " + styles.editorPhotoSelected : "") +
+                            (resizingId === photoId ? " " + styles.editorPhotoResizing : "")
                           }
                           style={{
                             left: `${layout.x}%`,
@@ -507,11 +646,32 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                             height: `${layout.h}%`,
                             transform: rot ? `rotate(${rot}deg)` : undefined,
                           }}
-                          onMouseDown={(e) => handleMouseDown(e, p.id)}
-                          onTouchStart={(e) => handleMouseDown(e, p.id)}
+                          onMouseDown={(e) => !resizingId && handleMouseDown(e, p.id)}
+                          onTouchStart={(e) => !resizingId && handleMouseDown(e, p.id)}
                           onClick={(e) => e.stopPropagation()}
                         >
                           <img src={getPhotoUrl(p.storage_path)} alt="" draggable={false} />
+                          {selectedId === photoId && selectedLayout && (
+                            <>
+                              {["nw", "ne", "sw", "se"].map((h) => (
+                                <div
+                                  key={h}
+                                  className={styles.editorResizeHandle}
+                                  data-handle={h}
+                                  onMouseDown={(ev) => { ev.stopPropagation(); handleResizeStart(ev, p.id, h); }}
+                                  onTouchStart={(ev) => { ev.stopPropagation(); handleResizeStart(ev, p.id, h); }}
+                                  aria-label={`Resize ${h}`}
+                                />
+                              ))}
+                              <div className={styles.editorPhotoControls}>
+                                {templateSlots && slotPhotoIds.includes(p.id) ? (
+                                  <button type="button" className={styles.editorPhotoRemoveBtn} onClick={(ev) => { ev.stopPropagation(); const idx = slotPhotoIds.indexOf(p.id); if (idx >= 0) unassignPhotoFromSlot(idx); setSelectedId(null); }}>הסר מהמקום</button>
+                                ) : onRemovePhoto ? (
+                                  <button type="button" className={styles.editorPhotoRemoveBtn} onClick={(ev) => { ev.stopPropagation(); handleRemovePhoto(); }}>הסר</button>
+                                ) : null}
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     }
@@ -564,7 +724,8 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                       className={
                         styles.editorPhoto +
                         (draggingId === p.id ? " " + styles.editorPhotoDragging : "") +
-                        (selectedId === p.id ? " " + styles.editorPhotoSelected : "")
+                        (selectedId === p.id ? " " + styles.editorPhotoSelected : "") +
+                        (resizingId === p.id ? " " + styles.editorPhotoResizing : "")
                       }
                       style={{
                         left: `${layout.x}%`,
@@ -573,11 +734,30 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                         height: `${layout.h}%`,
                         transform: rot ? `rotate(${rot}deg)` : undefined,
                       }}
-                      onMouseDown={(e) => handleMouseDown(e, p.id)}
-                      onTouchStart={(e) => handleMouseDown(e, p.id)}
+                      onMouseDown={(e) => !resizingId && handleMouseDown(e, p.id)}
+                      onTouchStart={(e) => !resizingId && handleMouseDown(e, p.id)}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <img src={getPhotoUrl(p.storage_path)} alt="" draggable={false} />
+                      {selectedId === p.id && selectedLayout && (
+                        <>
+                          {["nw", "ne", "sw", "se"].map((h) => (
+                            <div
+                              key={h}
+                              className={styles.editorResizeHandle}
+                              data-handle={h}
+                              onMouseDown={(ev) => { ev.stopPropagation(); handleResizeStart(ev, p.id, h); }}
+                              onTouchStart={(ev) => { ev.stopPropagation(); handleResizeStart(ev, p.id, h); }}
+                              aria-label={`Resize ${h}`}
+                            />
+                          ))}
+                          <div className={styles.editorPhotoControls}>
+                            {onRemovePhoto && (
+                              <button type="button" className={styles.editorPhotoRemoveBtn} onClick={(ev) => { ev.stopPropagation(); handleRemovePhoto(); }}>הסר</button>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
                   );
                 })
@@ -590,13 +770,15 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                 const y = sticker.y ?? 10;
                 const rot = sticker.rotation ?? 0;
                 const imgUrl = getElementUrl(sticker.path);
+                const isSelected = selectedStickerId === sticker.id;
                 return (
                   <div
                     key={sticker.id}
                     className={
                       styles.editorSticker +
                       (draggingStickerId === sticker.id ? " " + styles.editorPhotoDragging : "") +
-                      (selectedStickerId === sticker.id ? " " + styles.editorPhotoSelected : "")
+                      (isSelected ? " " + styles.editorPhotoSelected : "") +
+                      (resizingStickerId === sticker.id ? " " + styles.editorPhotoResizing : "")
                     }
                     style={{
                       left: `${x}%`,
@@ -605,102 +787,34 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                       height: `${h}%`,
                       transform: rot ? `rotate(${rot}deg)` : undefined,
                     }}
-                    onMouseDown={(e) => handleStickerMouseDown(e, sticker)}
-                    onTouchStart={(e) => handleStickerMouseDown(e, sticker)}
+                    onMouseDown={(e) => !resizingStickerId && handleStickerMouseDown(e, sticker)}
+                    onTouchStart={(e) => !resizingStickerId && handleStickerMouseDown(e, sticker)}
                     onClick={(e) => e.stopPropagation()}
                   >
                     <img src={imgUrl} alt="" className={styles.stickerImg} />
+                    {isSelected && (
+                      <>
+                        {["nw", "ne", "sw", "se"].map((handleKey) => (
+                          <div
+                            key={handleKey}
+                            className={styles.editorResizeHandle}
+                            data-handle={handleKey}
+                            onMouseDown={(ev) => { ev.stopPropagation(); handleStickerResizeStart(ev, sticker.id, handleKey); }}
+                            onTouchStart={(ev) => { ev.stopPropagation(); handleStickerResizeStart(ev, sticker.id, handleKey); }}
+                            aria-label={`Resize ${handleKey}`}
+                          />
+                        ))}
+                        <div className={styles.editorPhotoControls}>
+                          <button type="button" className={styles.editorPhotoRemoveBtn} onClick={(ev) => { ev.stopPropagation(); removeSticker(sticker.id); }}>הסר אלמנט</button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
           <div className={styles.editorControlsCol}>
-            {selectedId && (
-              <div className={styles.editorControls}>
-                <h4>כיוונון תמונה</h4>
-                {selectedLayout && (
-                <>
-                  <label className={styles.controlRow}>
-                    <span>סיבוב (מעלות)</span>
-                    <input
-                      type="range"
-                      min={-180}
-                      max={180}
-                      value={selectedLayout.rotation ?? 0}
-                      onChange={(e) => updateLayout(selectedId, { rotation: Number(e.target.value) })}
-                      className={styles.slider}
-                    />
-                    <span className={styles.controlValue}>{selectedLayout.rotation ?? 0}°</span>
-                  </label>
-                  <label className={styles.controlRow}>
-                    <span>גודל (%)</span>
-                    <input
-                      type="range"
-                      min={10}
-                      max={90}
-                      value={Math.round(((selectedLayout.w ?? 46) + (selectedLayout.h ?? 46)) / 2)}
-                      onChange={(e) => {
-                        const size = Number(e.target.value);
-                        updateLayout(selectedId, { w: size, h: size });
-                      }}
-                      className={styles.slider}
-                    />
-                    <span className={styles.controlValue}>{Math.round(((selectedLayout.w ?? 46) + (selectedLayout.h ?? 46)) / 2)}%</span>
-                  </label>
-                  {onRemovePhoto && (
-                    <button type="button" className={styles.removeItemBtn} onClick={handleRemovePhoto}>
-                      הסר תמונה
-                    </button>
-                  )}
-                  {templateSlots && slotPhotoIds.includes(selectedId) && (
-                    <button
-                      type="button"
-                      className={styles.removeItemBtn}
-                      onClick={() => { const idx = slotPhotoIds.indexOf(selectedId); if (idx >= 0) unassignPhotoFromSlot(idx); setSelectedId(null); }}
-                    >
-                      הסר מהמקום
-                    </button>
-                  )}
-                </>
-              )}
-              </div>
-            )}
-            {selectedStickerId && selectedSticker && (
-              <div className={styles.editorControls}>
-                <h4>כיוונון אלמנט</h4>
-                <label className={styles.controlRow}>
-                  <span>סיבוב (מעלות)</span>
-                  <input
-                    type="range"
-                    min={-180}
-                    max={180}
-                    value={selectedSticker.rotation ?? 0}
-                    onChange={(e) => updateSticker(selectedStickerId, { rotation: Number(e.target.value) })}
-                    className={styles.slider}
-                  />
-                  <span className={styles.controlValue}>{selectedSticker.rotation ?? 0}°</span>
-                </label>
-                <label className={styles.controlRow}>
-                  <span>גודל (%)</span>
-                  <input
-                    type="range"
-                    min={5}
-                    max={45}
-                    value={Math.round(((selectedSticker.w ?? STICKER_DEFAULT_SIZE) + (selectedSticker.h ?? STICKER_DEFAULT_SIZE)) / 2)}
-                    onChange={(e) => {
-                      const size = Number(e.target.value);
-                      updateSticker(selectedStickerId, { w: size, h: size });
-                    }}
-                    className={styles.slider}
-                  />
-                  <span className={styles.controlValue}>{Math.round(((selectedSticker.w ?? STICKER_DEFAULT_SIZE) + (selectedSticker.h ?? STICKER_DEFAULT_SIZE)) / 2)}%</span>
-                </label>
-                <button type="button" className={styles.removeItemBtn} onClick={() => removeSticker(selectedStickerId)}>
-                  הסר אלמנט
-                </button>
-              </div>
-            )}
             <div className={styles.editorControls}>
               <h4>צבע רקע העמוד</h4>
               <label className={styles.controlRow}>
@@ -1047,6 +1161,7 @@ export default function EditPages() {
 
   return (
     <div className={styles.page}>
+      <StageIndicator current={3} />
       <header className={styles.header}>
         <h1>הוספת תמונות לאלבום</h1>
         <p className={styles.sub}>לחץ "ערוך עמוד" להוספת תמונות ולהזזתן על העמוד.</p>
@@ -1084,20 +1199,14 @@ export default function EditPages() {
         </div>
       </div>
 
-      <div className={styles.spreadActions}>
-        <button type="button" className={styles.addSpreadBtn} onClick={handleAddSpread}>
-          + הוסף spread (2 עמודים)
-        </button>
-      </div>
-
       {error && <p className={styles.error}>{error}</p>}
 
       <div className={styles.actions}>
-        <button type="button" onClick={() => navigate(`/album/${id}/cover`)} className={styles.secondary}>
-          חזרה לכריכה
+        <button type="button" onClick={() => navigate(`/album/${id}/pages-count`)} className={styles.secondary}>
+          חזרה למספר עמודים
         </button>
-        <button type="button" onClick={handleFinishAndDownload} disabled={generatingPdf} className={styles.cta}>
-          {generatingPdf ? "יוצר PDF ושומר..." : "סיום והורדת PDF"}
+        <button type="button" onClick={() => navigate(`/album/${id}/preview`)} className={styles.cta}>
+          לצפייה באלבום
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAlbum, updateAlbum, getPremadeCoverList, uploadCover, getPremadeCoverUrl } from "../api";
+import StageIndicator from "../components/StageIndicator";
 import styles from "./EditCover.module.css";
 
 const MIN_FONT = 14;
@@ -183,7 +184,7 @@ export default function EditCover() {
           texts: texts.filter((t) => t.content.trim() !== "").map(({ id: _id, ...t }) => t),
         },
       });
-      navigate(`/album/${id}/pages`);
+      navigate(`/album/${id}/pages-count`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -198,6 +199,7 @@ export default function EditCover() {
 
   return (
     <div className={styles.page}>
+      <StageIndicator current={1} />
       <header className={styles.header}>
         <h1>עיצוב כריכה</h1>
         <p className={styles.sub}>בחר רקע והוסף טקסטים על הכריכה</p>
@@ -339,6 +341,7 @@ export default function EditCover() {
             const url = getPremadeCoverUrl(c.path);
             const isSelected = selectedPremadePath === c.path;
             const path = c.path;
+            const name = c.name || (path && path.split("/").pop()?.replace(/\.[^.]+$/, "")) || path || "";
             return (
               <label
                 key={"premade-" + path}
@@ -353,7 +356,8 @@ export default function EditCover() {
                   onChange={() => path && handleSelectPremade(path)}
                   className={styles.optionRadio}
                 />
-                <img src={url} alt="" />
+                <img src={url} alt={name || "כריכה"} />
+                {name ? <span className={styles.coverName}>{name}</span> : null}
               </label>
             );
           })}

@@ -63,6 +63,12 @@ export async function getAlbum(id) {
   return r.json();
 }
 
+export async function getAlbumByShareToken(token) {
+  const r = await fetch(`${API}/albums/by-share-token/${encodeURIComponent(token)}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function createAlbum(body = {}) {
   const r = await fetch(`${API}/albums`, {
     method: "POST",
