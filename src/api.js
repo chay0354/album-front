@@ -107,6 +107,15 @@ export async function getPremadeCoverList() {
   return r.json();
 }
 
+/** Upload a cover to the premade-covers bucket (admin). Files appear in EditCover "בחר רקע כריכה". */
+export async function uploadPremadeCover(file) {
+  const fd = new FormData();
+  fd.append("file", file);
+  const r = await fetch(`${API}/covers/premade/upload`, { method: "POST", body: fd });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function uploadCover(file) {
   const compressed = await compressImageForUpload(file);
   const fd = new FormData();

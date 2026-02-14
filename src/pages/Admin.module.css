@@ -31,6 +31,70 @@
   color: var(--accent);
 }
 
+.coverSection {
+  background: var(--surface);
+  border: 1px solid var(--surface2);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+.coverSectionTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 0.35rem;
+  color: var(--text);
+}
+
+.coverSectionSub {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0 0 1rem;
+}
+
+.coverUploadRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.coverFileInput {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.coverUploadBtn {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.coverUploadBtn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.coverUploadBtn:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+.coverCount {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin: 0.75rem 0 0;
+}
+
 .center {
   display: flex;
   flex-direction: column;
