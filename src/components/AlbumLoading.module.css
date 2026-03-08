@@ -1,0 +1,67 @@
+.wrap {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+}
+
+.albumShape {
+  position: relative;
+  width: 120px;
+  height: 160px;
+  background: var(--surface2, #e0e0e0);
+  border-radius: 6px 12px 12px 6px;
+  overflow: hidden;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.albumFill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0%;
+  background: linear-gradient(
+    to top,
+    var(--accent) 0%,
+    rgba(255, 255, 255, 0.4) 100%
+  );
+  border-radius: 0 0 10px 5px;
+  animation: fillUp 1.8s ease-in-out infinite;
+}
+
+.albumSpine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.12) 0%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+  border-radius: 6px 0 0 12px;
+}
+
+.label {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin: 0;
+  text-align: center;
+}
+
+@keyframes fillUp {
+  0%,
+  100% {
+    height: 0%;
+  }
+  50% {
+    height: 100%;
+  }
+}

@@ -1,0 +1,62 @@
+.wrap {
+  margin-bottom: 1.5rem;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: center;
+  align-items: center;
+}
+
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius, 6px);
+  font-size: 0.85rem;
+  color: var(--text-muted, #666);
+  background: var(--surface2, #eee);
+}
+
+.step.done {
+  color: var(--text, #111);
+  background: var(--surface, #fff);
+}
+
+.step.current {
+  font-weight: 600;
+  color: var(--on-accent, #fff);
+  background: var(--accent, #2563eb);
+}
+
+.num {
+  font-weight: 700;
+}
+
+.currentLabel {
+  text-align: center;
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text, #111);
+}
+
+.currentLabelWhite {
+  color: #fff;
+}
+
+@media (max-width: 768px) {
+  .bar {
+    gap: 0.35rem 0.5rem;
+  }
+  .step {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+  }
+  .step .label {
+    display: none;
+  }
+}

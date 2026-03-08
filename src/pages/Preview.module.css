@@ -1,0 +1,519 @@
+/* Stage 4: Interactive flip-book album – bubble same as stages 1 & 2 */
+
+.page {
+  padding: 0.5rem 1.25rem 0.75rem;
+  max-width: 640px;
+  margin: 0.5rem auto;
+  background: #e8e8e8;
+  border-radius: 24px;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.1),
+    0 16px 48px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--surface2, #d0d0d0);
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: calc(100vh - 2rem);
+}
+
+.header {
+  text-align: center;
+  padding: 0 0 0.5rem;
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 0.2rem;
+}
+
+.sub {
+  color: var(--text-muted);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.bookWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* A4 frame: aspect-ratio sets height from width so the box is always A4. Scale is applied in JS. */
+.bookFrame {
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+/* Desktop: spread = two A4 side by side → 420:297 */
+@media (min-width: 769px) {
+  .bookFrame {
+    aspect-ratio: 420/297;
+  }
+}
+
+/* Mobile: single A4 page → 210:297 */
+@media (max-width: 768px) {
+  .bookFrame {
+    aspect-ratio: 210/297;
+  }
+}
+
+.bookContainer {
+  border-radius: 8px;
+  overflow: visible;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  /* Fixed size for flip-book; scale applied in JS to fit A4 frame */
+  width: 680px;
+  height: 481px;
+}
+
+@media (max-width: 768px) {
+  .bookContainer {
+    width: 340px;
+    height: 481px;
+  }
+}
+
+/* When showing standalone cover or back: frame size and space below */
+.standaloneCoverFrame {
+  aspect-ratio: 210/220 !important;
+  max-width: 380px;
+  min-height: 200px;
+}
+
+.bookWrapStandaloneCover {
+  gap: 0.4rem;
+}
+
+.standaloneCoverWrap {
+  flex-shrink: 0;
+  width: 340px;
+  height: 481px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  clip-path: inset(0 10% 0 0); /* front cover: cut 10% dead space on the right */
+}
+
+.standaloneCoverWrapBack {
+  clip-path: inset(0 0 0 2%); /* back cover: just a little trim on the left */
+}
+
+.standaloneCover {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e8e8e8;
+}
+
+.standaloneCoverImg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: left center;
+}
+
+.standaloneCoverImg.coverClipRight {
+  background-position: left center;
+  background-size: 192% 100%;
+}
+
+.standaloneCoverImgBack.coverClipLeft {
+  background-position: right center;
+  background-size: 208% 100%;
+  clip-path: inset(0 0 0 2%);
+  min-width: 100%;
+  min-height: 100%;
+}
+
+/* Each flip-book page content – same background as outer bubble */
+.flipPage {
+  width: 100%;
+  height: 100%;
+  background: #e8e8e8;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.flipPageCover {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: left center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+
+/* Cover and back cover images at 60% size, centered */
+.coverPage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.coverPage .flipPageCover {
+  transform: translateX(-100px) scale(0.6);
+  transform-origin: center;
+}
+
+/* Mobile: show left 52% on front cover, right 48% on back cover (like before) */
+@media (max-width: 768px) {
+  .coverPage .flipPageCover {
+    transform: none;
+  }
+  .coverPage .flipPageCover.coverClipRight {
+    background-position: left center;
+    background-size: 192% 100%; /* left 52% of image fills the page */
+  }
+  .coverPage .flipPageCover.flipPageCoverBack.coverClipLeft {
+    background-position: right center;
+    background-size: 208% 100%; /* right 48% of image fills the page */
+  }
+}
+
+/* Desktop 2-page spread: make cover/back cover span full width (both halves) like a single page.
+   Use transform (not left) so RTL doesn't push the cover to the right. */
+@media (min-width: 769px) {
+  .coverPage {
+    width: 200% !important;
+    max-width: none;
+    transform: translateX(calc(-50% + 340px));
+  }
+  .coverPage.backCoverPage {
+    transform: translateX(calc(-50% + 200px));
+    overflow: visible;
+  }
+  .coverPage.backCoverPage .flipPageCover {
+    overflow: visible;
+  }
+  .coverPage .flipPageCover {
+    width: 100%;
+  }
+  .coverPage.coverPage .flipPageCover.coverClipRight {
+    clip-path: inset(0 52% 0 0);
+    background-position: 25% center;
+  }
+  .coverPage.coverPage .flipPageCover.coverClipLeft {
+    clip-path: inset(0 0 0 2.5%);
+  }
+  /* Back cover on web: show only the right 48% (cut 52% from left), centered */
+  .coverPage.coverPage .flipPageCover.flipPageCoverBack.coverClipLeft {
+    clip-path: inset(0 0 0 52%);
+    background-position: 76% center;
+  }
+}
+
+/* Stage 4: front cover – mobile: full cover with small spine clip; desktop overrides below */
+.coverClipRight {
+  clip-path: inset(0 8% 0 0);
+  background-position: left center;
+}
+
+.coverClipLeft {
+  clip-path: inset(0 0 0 5%);
+}
+
+.flipPageCoverBack {
+  background-position: right center;
+}
+
+.flipPageCoverOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, transparent 45%);
+}
+
+.flipPageCoverText {
+  position: absolute;
+  color: #fff;
+  font-weight: 600;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Spread: same height as cover, two halves fill the page */
+.flipPageSpread {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0;
+  width: 100%;
+  height: 100%;
+  padding: 2%;
+  box-sizing: border-box;
+}
+
+.flipPageSpread .flipHalf {
+  flex: 1;
+  min-width: 0;
+  max-width: 50%;
+  position: relative;
+  border-radius: 2px 8px 8px 2px;
+  overflow: hidden;
+}
+
+.flipPageSpread .flipHalf:last-child {
+  border-radius: 8px 2px 2px 8px;
+}
+
+/* RTL: first/last are visually swapped, so swap radius so outer edge is rounded */
+[dir="rtl"] .flipPageSpread .flipHalf:first-child {
+  border-radius: 8px 2px 2px 8px;
+}
+[dir="rtl"] .flipPageSpread .flipHalf:last-child {
+  border-radius: 2px 8px 8px 2px;
+}
+
+.spine {
+  width: 4px;
+  flex-shrink: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.15) 50%, rgba(0,0,0,0.08) 100%);
+  border-radius: 1px;
+}
+
+/* Mobile: one page at a time, full width */
+.flipPageSingle {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 2%;
+  box-sizing: border-box;
+}
+
+.flipPageSingle .flipHalf {
+  max-width: 100%;
+  flex: 1;
+  border-radius: 8px;
+}
+
+/* Web: inner pages use full page size so each half stays A4 (210/297) */
+@media (min-width: 769px) {
+  .flipPage:not(.coverPage) .flipPageSingle {
+    width: 100%;
+    height: 100%;
+  }
+  .flipPage:not(.coverPage) .flipPageSingle .flipHalf {
+    height: 100%;
+  }
+}
+
+.flipHalf {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.flipHalf:last-child {
+  border-radius: 8px 2px 2px 8px;
+}
+
+[dir="rtl"] .flipHalf:first-child {
+  border-radius: 8px 2px 2px 8px;
+}
+[dir="rtl"] .flipHalf:last-child {
+  border-radius: 8px;
+}
+
+.flipHalfPhotos {
+  position: absolute;
+  inset: 0;
+}
+
+/* Match editor photo slot: same aspect (A4), same containment and crop behavior */
+.flipHalfPhoto {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.flipHalfPhoto img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.flipHalfPhotoCropWrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flipHalfPhotoCroppedImg {
+  position: absolute;
+  min-width: 100%;
+  min-height: 100%;
+  object-fit: cover;
+}
+
+.flipHalfStickers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.flipHalfSticker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flipHalfSticker img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.flipHalfTexts {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.flipHalfText {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.navWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.navBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--surface2, #d0d0d0);
+  background: var(--surface, #fff);
+  color: var(--text, #1a1a1a);
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.navBtn:hover:not(:disabled) {
+  border-color: var(--accent-soft);
+  background: var(--accent-soft);
+}
+
+.navBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.viewLabel {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  min-width: 120px;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 0.5rem 0 0;
+}
+
+.blankNotice {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--text-muted, #666);
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 8px;
+  text-align: center;
+  max-width: 100%;
+}
+
+.secondary {
+  padding: 0.6rem 1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--surface2, #d0d0d0);
+  background: var(--surface, #fff);
+  color: var(--text, #1a1a1a);
+  font-size: 0.95rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.secondary:hover {
+  background: var(--surface2, #e0e0e0);
+}
+
+.cta {
+  padding: 0.6rem 1.25rem;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.cta:hover {
+  filter: brightness(1.1);
+}
+
+.center {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error {
+  color: #f87171;
+  margin: 1rem 0;
+}
