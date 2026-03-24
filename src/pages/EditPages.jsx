@@ -9,7 +9,6 @@ import {
   getPhotoUrl,
   getCoverUrl,
   getPdfDownloadUrl,
-  generatePdfFromImages,
   movePhotoToPage,
   removePhoto,
   updatePhotoLayout,
@@ -18,7 +17,10 @@ import {
   getElementUrl,
 } from "../api";
 import html2canvas from "html2canvas";
-import { toJpeg, getFontEmbedCSS } from "html-to-image";
+import { toJpeg } from "html-to-image";
+import { domToJpeg } from "modern-screenshot";
+import { buildPdfBlobFromJpegDataUrls } from "../pdfClient";
+import { saveLocalPdfBlob } from "../pdfLocalCache";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
@@ -425,8 +427,8 @@ function setMinimalDragImage(e) {
 const PDF_OUT_W = 595;
 const PDF_OUT_H = 842;
 
-/** Snapshot visible DOM (what the user sees) → JPEG scaled to PDF page size. Uses html-to-image (SVG) so Hebrew matches the screen. */
-async function captureVisibleElementToPdfJpeg(el, fontEmbedCSS) {
+/** Raster snapshot of the visible page (pixels only — no PDF font encoding). Order: modern-screenshot → html-to-image → html2canvas. */
+async function captureVisibleElementToPdfJpeg(el) {
   if (!el || !(el instanceof HTMLElement)) throw new Error("PDF capture: no element");
 
   await document.fonts.ready;
@@ -437,27 +439,38 @@ async function captureVisibleElementToPdfJpeg(el, fontEmbedCSS) {
 
   let dataUrl;
   try {
-    dataUrl = await toJpeg(el, {
-      quality: 0.9,
-      pixelRatio: pr,
-      cacheBust: true,
+    dataUrl = await domToJpeg(el, {
+      quality: 0.92,
+      scale: pr,
       backgroundColor: "#ffffff",
-      skipFonts: false,
-      ...(fontEmbedCSS ? { fontEmbedCSS } : {}),
+      fetch: { bypassingCache: true },
+      drawImageInterval: 150,
+      timeout: 45000,
     });
   } catch (e1) {
-    console.warn("[PDF] toJpeg failed, falling back to html2canvas:", e1?.message || e1);
-    const canvas = await html2canvas(el, {
-      scale: pr,
-      useCORS: true,
-      foreignObjectRendering: true,
-      logging: false,
-      backgroundColor: "#ffffff",
-      imageTimeout: 20000,
-      scrollX: 0,
-      scrollY: -window.scrollY,
-    });
-    dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    console.warn("[PDF] domToJpeg failed:", e1?.message || e1);
+    try {
+      dataUrl = await toJpeg(el, {
+        quality: 0.9,
+        pixelRatio: pr,
+        cacheBust: true,
+        backgroundColor: "#ffffff",
+        skipFonts: false,
+      });
+    } catch (e2) {
+      console.warn("[PDF] toJpeg failed, html2canvas:", e2?.message || e2);
+      const canvas = await html2canvas(el, {
+        scale: pr,
+        useCORS: true,
+        foreignObjectRendering: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        imageTimeout: 20000,
+        scrollX: 0,
+        scrollY: -window.scrollY,
+      });
+      dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    }
   }
 
   const img = new Image();
@@ -509,6 +522,7 @@ function AlbumCover({ album, coverUrl }) {
             transform: "translate(-50%, -50%)",
             fontSize: `${t.fontSize ?? 28}px`,
             color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
+            fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
           }}
         >
           {t.content}
@@ -3420,13 +3434,6 @@ export default function EditPages() {
         setStudioSpreadFontSizeLive(null);
       });
 
-      let fontEmbedCSS = "";
-      try {
-        fontEmbedCSS = await getFontEmbedCSS(document.body);
-      } catch (_) {
-        /* optional; toJpeg still works */
-      }
-
       const images = [];
       for (const step of captureSteps) {
         if (step.kind === "cover") {
@@ -3445,17 +3452,18 @@ export default function EditPages() {
         const el = document.querySelector(selector);
         if (!el) throw new Error("לא נמצא תוכן לצילום PDF");
 
-        images.push(await captureVisibleElementToPdfJpeg(el, fontEmbedCSS));
+        images.push(await captureVisibleElementToPdfJpeg(el));
       }
 
-      const { blob, pdfUrl } = await generatePdfFromImages(id, images);
+      const blob = buildPdfBlobFromJpegDataUrls(images);
+      await saveLocalPdfBlob(id, blob);
       const objUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objUrl;
       a.download = "album.pdf";
       a.click();
       URL.revokeObjectURL(objUrl);
-      navigate(`/album/${id}/done`, { state: { pdfUrl } });
+      navigate(`/album/${id}/done`, { state: { clientPdf: true } });
     } catch (e) {
       setError(e.message || "שגיאה ביצירת PDF");
     } finally {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
 import { getAlbum, updateAlbum, getPdfDownloadUrl } from "../api";
+import { getLocalPdfBlob } from "../pdfLocalCache";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import styles from "./Done.module.css";
@@ -16,7 +17,34 @@ export default function Done() {
   const { state } = useLocation();
   const [album, setAlbum] = useState(null);
   const [shareUrl, setShareUrl] = useState("");
-  const pdfUrl = (state?.pdfUrl && id) ? state.pdfUrl : (id ? getPdfDownloadUrl(id) : "");
+  const [localPdfObjectUrl, setLocalPdfObjectUrl] = useState(null);
+
+  const serverPdfUrl = id ? getPdfDownloadUrl(id) : "";
+  const pdfUrl =
+    localPdfObjectUrl ||
+    (state?.pdfUrl && id ? state.pdfUrl : "") ||
+    serverPdfUrl;
+
+  useEffect(() => {
+    if (!id) return undefined;
+    let cancelled = false;
+    let objectUrl = null;
+    (async () => {
+      const blob = await getLocalPdfBlob(id).catch(() => null);
+      if (cancelled || !blob) return;
+      objectUrl = URL.createObjectURL(blob);
+      if (cancelled) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+      setLocalPdfObjectUrl(objectUrl);
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setLocalPdfObjectUrl(null);
+    };
+  }, [id]);
 
   useEffect(() => {
     let cancelled = false;
