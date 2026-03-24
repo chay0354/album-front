@@ -3960,7 +3960,7 @@ export default function EditPages() {
           <span className={styles.studioTopBtnIcon} aria-hidden>›</span>
           <span>שלב הבא</span>
           <span className={styles.studioTopBtnNextSub}>צפייה באלבום</span>
-        </button>
+          </button>
         <button
           type="button"
           className={styles.studioTopBtn}
@@ -4230,8 +4230,8 @@ export default function EditPages() {
                 <StudioDockIconText />
               </span>
               <span className={styles.studioDockLabel}>טקסט</span>
-            </button>
-          </div>
+        </button>
+      </div>
         </div>
       )}
 

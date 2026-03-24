@@ -2066,7 +2066,7 @@
   padding: 0.5rem 0.75rem 5.5rem;
   max-width: 520px;
   margin: 0 auto;
-  background: linear-gradient(180deg, #e4e6ea 0%, #dfe1e6 100%);
+  background: #f5f6f8;
   overscroll-behavior-y: contain;
 }
 
