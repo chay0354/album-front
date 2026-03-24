@@ -1044,17 +1044,17 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.45rem 0.6rem;
-  background: rgba(17, 24, 39, 0.94);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(180deg, #f3f4f6 0%, #e5e7eb 100%);
+  border-bottom: 1px solid #d1d5db;
   flex-shrink: 0;
 }
 
 .studioPhotoSelectionBarBtn {
   padding: 0.35rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  color: #f9fafb;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
   font-size: 0.8rem;
   font-weight: 600;
   font-family: inherit;
@@ -1062,17 +1062,19 @@
 }
 
 .studioPhotoSelectionBarBtn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: #f9fafb;
   border-color: var(--accent, #e8b86d);
 }
 
 .studioPhotoSelectionBarBtnDanger {
-  border-color: rgba(248, 113, 113, 0.5);
-  color: #fecaca;
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
 }
 
 .studioPhotoSelectionBarBtnDanger:hover {
-  background: rgba(248, 113, 113, 0.2);
+  background: #fee2e2;
+  border-color: #f87171;
 }
 
 .editorPhotoOuter {
@@ -2065,6 +2067,7 @@
   max-width: 520px;
   margin: 0 auto;
   background: linear-gradient(180deg, #e4e6ea 0%, #dfe1e6 100%);
+  overscroll-behavior-y: contain;
 }
 
 .studioTopBar {
@@ -2147,9 +2150,22 @@
   margin-bottom: 0.5rem;
 }
 
-/* Floating text format bar — above spread frame */
+/* Nav row + in-flow text toolbar (sits above the spread / “book”) */
+.studioSpreadTop {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 0.65rem;
+}
+
+.studioSpreadTop .studioTextToolbar {
+  margin-top: 0.55rem;
+  margin-bottom: 0;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+}
+
+/* Text format bar (studio: between page nav and album spread) */
 .studioTextToolbar {
-  margin: 0 0 0.65rem;
+  margin: 0;
   padding: 0.65rem 0.75rem;
   background: linear-gradient(180deg, #fafbfc 0%, #f3f4f6 100%);
   border: 1px solid #e5e7eb;
@@ -2281,6 +2297,7 @@
 
 .studioTextsLayer .pageTextDisplay {
   pointer-events: auto;
+  touch-action: none;
 }
 
 /* Spread preview: show full label width (no 200px cap / ellipsis) */
@@ -2312,6 +2329,7 @@
   unicode-bidi: plaintext;
   background: rgba(255, 255, 255, 0.15);
   border-radius: 4px;
+  touch-action: auto;
 }
 
 .studioTextDisplaySpread .pageTextInlineInput {
@@ -2327,6 +2345,8 @@
 }
 
 .studioSpreadFrame {
+  position: relative;
+  z-index: 1;
   border: 2px solid #4b5563;
   border-radius: 6px;
   overflow: hidden;
@@ -2449,7 +2469,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.35rem;
-  margin-bottom: 0.65rem;
+  margin-bottom: 0;
   padding: 0 0.15rem;
 }
 
@@ -2559,8 +2579,19 @@
 }
 
 .studioDockIcon {
-  font-size: 1.35rem;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  color: #374151;
+}
+
+.studioDockIcon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
 
 .studioDockLabel {
@@ -2568,6 +2599,9 @@
   font-weight: 600;
   color: #4b5563;
   white-space: nowrap;
+  text-align: center;
+  width: 100%;
+  line-height: 1.15;
 }
 
 .studioDockChevron {
@@ -2645,9 +2679,34 @@
   font-weight: 700;
 }
 
+.studioStickersSheet {
+  max-height: min(88vh, 88dvh);
+}
+
+.studioStickersSheetBody {
+  margin-top: 0.5rem;
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.25rem;
+}
+
+.studioStickersSheetBody .stickerPickerRow {
+  max-width: none;
+  width: 100%;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+@media (max-width: 380px) {
+  .studioStickersSheetBody .stickerPickerRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .studioSheetClose {
   position: absolute;
-  top: 0.65rem;
+  top: 0.3rem;
   left: 0.75rem;
   border: none;
   background: #f3f4f6;
@@ -2844,6 +2903,10 @@
   z-index: 10;
 }
 
+.studioSpreadFrame .pagePhotosAbsolute.studioSpreadStickersLayer {
+  z-index: 11;
+}
+
 .studioQrImg {
   display: block;
   margin: 0.75rem auto;
@@ -2961,42 +3024,57 @@
     margin-bottom: 0.3rem;
   }
 
-  .studioPageNav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: stretch;
-    justify-content: space-between;
-    row-gap: 0.45rem;
-    column-gap: 0.35rem;
+  .studioSpreadTop {
     margin-bottom: 0.45rem;
   }
 
-  /* Full-width row: page picker; next row: prev + next share one line (same height) */
-  .studioPageSelectWrap {
-    flex: 1 0 100%;
-    order: -1;
-    min-width: 0;
-    width: 100%;
+  /* One row: ‹ קודם | בחירת עמוד | הבא › — select centered between buttons */
+  .studioPageNav {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 0.3rem;
     margin-bottom: 0;
   }
 
-  .studioNavLink {
-    font-size: 0.74rem;
-    padding: 0.45rem 0.35rem;
-    min-height: 44px;
+  .studioSpreadTop .studioTextToolbar {
+    max-height: min(38vh, 280px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .studioPageSelectWrap {
     flex: 1 1 0;
+    order: 0;
+    min-width: 0;
+    width: auto;
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+  }
+
+  .studioNavLink {
+    font-size: 0.68rem;
+    padding: 0.45rem 0.2rem;
+    min-height: 44px;
+    flex: 0 1 30%;
+    max-width: 36%;
     min-width: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
+    line-height: 1.15;
+    text-align: center;
   }
 
   .studioPageSelect {
-    font-size: 0.78rem;
-    padding: 0.45rem 1.5rem 0.45rem 0.5rem;
+    font-size: 0.72rem;
+    padding: 0.45rem 1.35rem 0.45rem 0.45rem;
     min-height: 44px;
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
   }
 
@@ -3078,9 +3156,33 @@
     padding-right: max(0.3rem, env(safe-area-inset-right));
   }
 
+  .studioDockScroll {
+    justify-content: center;
+    flex-wrap: wrap;
+    overflow-x: visible;
+    row-gap: 0.35rem;
+    column-gap: 0.4rem;
+    padding: 0.2rem 0.45rem 0.15rem;
+    scroll-snap-type: none;
+  }
+
   .studioDockItem {
-    min-width: 58px;
+    min-width: 64px;
     min-height: 48px;
+    scroll-snap-align: unset;
+    align-items: center;
+    text-align: center;
+    padding: 0.4rem 0.45rem;
+  }
+
+  .studioDockIcon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .studioDockIcon svg {
+    width: 24px;
+    height: 24px;
   }
 
   .studioSheet {
@@ -3102,7 +3204,14 @@
 
 @media (max-width: 380px) {
   .studioNavLink {
+    font-size: 0.62rem;
+    padding: 0.4rem 0.15rem;
+    flex-basis: 28%;
+    max-width: 32%;
+  }
+
+  .studioPageSelect {
     font-size: 0.68rem;
-    padding: 0.4rem 0.25rem;
+    padding: 0.45rem 1.1rem 0.45rem 0.35rem;
   }
 }

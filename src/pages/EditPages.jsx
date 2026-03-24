@@ -21,6 +21,102 @@ import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
 import styles from "./EditPages.module.css";
 
+function StudioDockIconPhoto() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M3 17l5.5-5.5a1.5 1.5 0 012.12 0L16 17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="8.5" cy="9.5" r="1.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+function StudioDockIconLayout() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <rect x="3" y="3" width="7" height="7" rx="1.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <rect x="14" y="3" width="7" height="7" rx="1.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <rect x="3" y="14" width="7" height="7" rx="1.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
+      <rect x="14" y="14" width="7" height="7" rx="1.25" fill="none" stroke="currentColor" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+function StudioDockIconBackground() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M4 6.5a2 2 0 012-2h12a2 2 0 012 2v5H4z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4 11.5h16v6a2 2 0 01-2 2H6a2 2 0 01-2-2z"
+        fill="currentColor"
+        fillOpacity="0.3"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function StudioDockIconElements() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M12 3l1.8 5.5h5.7l-4.6 3.3 1.8 5.5L12 14.9 7.3 17.3l1.8-5.5L4.5 8.5h5.7L12 3z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function StudioDockIconQr() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <rect x="3" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.65" />
+      <rect x="14" y="3" width="7" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.65" />
+      <rect x="3" y="14" width="7" height="7" rx="1" fill="none" stroke="currentColor" strokeWidth="1.65" />
+      <rect x="5" y="5" width="3" height="3" fill="currentColor" />
+      <rect x="16" y="5" width="3" height="3" fill="currentColor" />
+      <rect x="5" y="16" width="3" height="3" fill="currentColor" />
+      <rect x="14" y="14" width="2" height="2" fill="currentColor" />
+      <rect x="17" y="14" width="2" height="2" fill="currentColor" />
+      <rect x="14" y="17" width="2" height="2" fill="currentColor" />
+      <rect x="18" y="17" width="3" height="3" fill="currentColor" />
+    </svg>
+  );
+}
+
+function StudioDockIconText() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M5 6h14M12 6v11M9 19h6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.85"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 const DEFAULT_LAYOUT = (index) => {
   const col = index % 2;
   const row = Math.floor(index / 2);
@@ -488,8 +584,9 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
   const dragRef = useRef({ type: "photo", id: null, startX: 0, startY: 0, startLayout: null, dragStarted: false });
   const resizeRef = useRef({ photoId: null, handle: null, startLayout: null, aspectK: 1 });
   const photoNaturalAspectRef = useRef({});
+  const stickerNaturalAspectRef = useRef({});
   const [resizingId, setResizingId] = useState(null);
-  const resizeStickerRef = useRef({ stickerId: null, handle: null, startLayout: null });
+  const resizeStickerRef = useRef({ stickerId: null, handle: null, startLayout: null, aspectK: 1 });
   const [resizingStickerId, setResizingStickerId] = useState(null);
   const [selectedTextId, setSelectedTextId] = useState(null);
   const [editingTextInlineId, setEditingTextInlineId] = useState(null);
@@ -538,7 +635,6 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       </div>
     );
   };
-  const MIN_STICKER_SIZE = 3;
   const MAX_XY = 100;
 
   useEffect(() => {
@@ -999,12 +1095,26 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     e.stopPropagation();
     const sticker = (pageConfig.stickers || []).find((s) => s.id === stickerId);
     if (!sticker || typeof sticker.x !== "number") return;
-    const layout = { x: sticker.x ?? 10, y: sticker.y ?? 10, w: sticker.w ?? STICKER_DEFAULT_SIZE, h: sticker.h ?? STICKER_DEFAULT_SIZE };
+    const layout = {
+      x: sticker.x ?? 10,
+      y: sticker.y ?? 10,
+      w: sticker.w ?? STICKER_DEFAULT_SIZE,
+      h: sticker.h ?? STICKER_DEFAULT_SIZE,
+      rotation: sticker.rotation ?? 0,
+    };
     setResizingStickerId(stickerId);
-    resizeStickerRef.current = { stickerId, handle, startLayout: { ...layout } };
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) {
+      setResizingStickerId(null);
+      return;
+    }
     const rect = el.getBoundingClientRect();
+    const l0 = { ...layout };
+    const nat = stickerNaturalAspectRef.current[stickerId];
+    const R = nat && nat.width > 0 && nat.height > 0 ? nat.width / nat.height : null;
+    const aspectK =
+      R != null && R > 0 && Number.isFinite(R) ? layoutAspectRatioFromImage(R, rect) : l0.w / Math.max(l0.h, 1e-6);
+    resizeStickerRef.current = { stickerId, handle, startLayout: l0, aspectK };
     const toPct = (clientX, clientY) => ({
       x: ((clientX - rect.left) / rect.width) * 100,
       y: ((clientY - rect.top) / rect.height) * 100,
@@ -1015,31 +1125,16 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
       if (!ref.stickerId || !ref.handle) return;
       const { x: pctX, y: pctY } = toPct(getCoords(ev).x, getCoords(ev).y);
       const l = ref.startLayout;
-      let newX = l.x, newY = l.y, newW = l.w, newH = l.h;
-      switch (ref.handle) {
-        case "se":
-          newW = Math.max(MIN_STICKER_SIZE, Math.min(MAX_XY - l.x, pctX - l.x));
-          newH = Math.max(MIN_STICKER_SIZE, Math.min(MAX_XY - l.y, pctY - l.y));
-          break;
-        case "sw":
-          newX = Math.max(0, Math.min(l.x + l.w - MIN_STICKER_SIZE, pctX));
-          newW = l.x + l.w - newX;
-          newH = Math.max(MIN_STICKER_SIZE, Math.min(MAX_XY - l.y, pctY - l.y));
-          break;
-        case "ne":
-          newW = Math.max(MIN_STICKER_SIZE, Math.min(MAX_XY - l.x, pctX - l.x));
-          newY = Math.max(0, Math.min(l.y + l.h - MIN_STICKER_SIZE, pctY));
-          newH = l.y + l.h - newY;
-          break;
-        case "nw":
-          newX = Math.max(0, Math.min(l.x + l.w - MIN_STICKER_SIZE, pctX));
-          newY = Math.max(0, Math.min(l.y + l.h - MIN_STICKER_SIZE, pctY));
-          newW = l.x + l.w - newX;
-          newH = l.y + l.h - newY;
-          break;
-        default:
-          return;
-      }
+      const k = ref.aspectK;
+      const { x: newX, y: newY, w: newW, h: newH } = resizeLayoutKeepImageAspect(
+        ref.handle,
+        l,
+        pctX,
+        pctY,
+        k,
+        MIN_SIZE,
+        MAX_XY
+      );
       setPageConfig((prev) => ({
         ...prev,
         stickers: (prev.stickers || []).map((s) =>
@@ -1049,7 +1144,7 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     };
     const onUp = () => {
       setResizingStickerId(null);
-      resizeStickerRef.current = { stickerId: null, handle: null, startLayout: null };
+      resizeStickerRef.current = { stickerId: null, handle: null, startLayout: null, aspectK: 1 };
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
       window.removeEventListener("touchmove", onMove);
@@ -1499,7 +1594,20 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                     onTouchStart={(e) => !resizingStickerId && handleStickerMouseDown(e, sticker)}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <img src={imgUrl} alt="" className={styles.stickerImg} />
+                    <img
+                      src={imgUrl}
+                      alt=""
+                      className={styles.stickerImg}
+                      onLoad={(ev) => {
+                        const im = ev.currentTarget;
+                        if (im.naturalWidth > 0 && im.naturalHeight > 0) {
+                          stickerNaturalAspectRef.current[sticker.id] = {
+                            width: im.naturalWidth,
+                            height: im.naturalHeight,
+                          };
+                        }
+                      }}
+                    />
                     {isSelected && (
                       <>
                         {["nw", "ne", "sw", "se"].map((handleKey) => (
@@ -1535,7 +1643,6 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                     fontSize: `${t.fontSize}px`,
                     color: isValidHex(t.color) ? t.color : DEFAULT_TEXT_COLOR,
                     fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
-                    touchAction: "manipulation",
                   }}
                   onMouseDown={(e) => handleTextPointerDown(e, t.id)}
                   onTouchStart={(e) => handleTextPointerDown(e, t.id)}
@@ -2090,7 +2197,6 @@ function StudioSpreadTexts({
               fontSize: `${spreadSize}px`,
               color: isValidHex(t.color) ? t.color : DEFAULT_TEXT_COLOR,
               fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
-              touchAction: "manipulation",
             }}
             onMouseDown={(e) => handleTextPointerDown(e, t.id)}
             onTouchStart={(e) => handleTextPointerDown(e, t.id)}
@@ -2529,6 +2635,361 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
   );
 }
 
+function layoutFromSticker(s) {
+  return {
+    x: typeof s.x === "number" ? s.x : 15,
+    y: typeof s.y === "number" ? s.y : 15,
+    w: typeof s.w === "number" ? s.w : STICKER_DEFAULT_SIZE,
+    h: typeof s.h === "number" ? s.h : STICKER_DEFAULT_SIZE,
+    rotation: s.rotation ?? 0,
+  };
+}
+
+/** Studio spread: stickers — same drag, snap guides, and corner resize (aspect lock) as photos. */
+function StudioSpreadStickers({ stickers, getElementUrl, selectedStickerId, onSelectSticker, onPersistLayout }) {
+  const containerRef = useRef(null);
+  const sorted = useMemo(
+    () => [...(stickers || [])].filter((s) => s.path).sort((a, b) => String(a.id).localeCompare(String(b.id))),
+    [stickers]
+  );
+  const layoutSyncKey = sorted.map((s) => `${s.id}:${s.x}:${s.y}:${s.w}:${s.h}:${s.rotation ?? 0}`).join(";");
+  const [layouts, setLayouts] = useState({});
+  const layoutsRef = useRef(layouts);
+  const dragRef = useRef({ id: null, startX: 0, startY: 0, startLayout: null, dragStarted: false });
+  const resizeRef = useRef({ stickerId: null, handle: null, startLayout: null, aspectK: 1 });
+  const naturalAspectByStickerRef = useRef({});
+  const [draggingId, setDraggingId] = useState(null);
+  const [resizingId, setResizingId] = useState(null);
+  const [guideLines, setGuideLines] = useState({ vertical: [], horizontal: [] });
+
+  useEffect(() => {
+    layoutsRef.current = layouts;
+  }, [layouts]);
+
+  useEffect(() => {
+    const next = {};
+    sorted.forEach((s) => {
+      next[s.id] = layoutFromSticker(s);
+    });
+    setLayouts(next);
+  }, [layoutSyncKey]);
+
+  const getCoords = useCallback((e) => {
+    if (e.touches?.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    if (e.changedTouches?.length) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    return { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handleResizeStart = useCallback(
+    (e, stickerId, handle) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const layout = layoutsRef.current[stickerId];
+      if (!layout || typeof layout.x !== "number") return;
+      onSelectSticker(stickerId);
+      setResizingId(stickerId);
+      const el = containerRef.current;
+      if (!el) {
+        setResizingId(null);
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const l0 = { ...layout };
+      const nat = naturalAspectByStickerRef.current[stickerId];
+      const R = nat && nat.width > 0 && nat.height > 0 ? nat.width / nat.height : null;
+      const aspectK =
+        R != null && R > 0 && Number.isFinite(R)
+          ? layoutAspectRatioFromImage(R, rect)
+          : l0.w / Math.max(l0.h, 1e-6);
+      resizeRef.current = { stickerId, handle, startLayout: l0, aspectK };
+      const toPct = (clientX, clientY) => ({
+        x: ((clientX - rect.left) / rect.width) * 100,
+        y: ((clientY - rect.top) / rect.height) * 100,
+      });
+      const onMove = (ev) => {
+        ev.preventDefault();
+        const ref = resizeRef.current;
+        if (!ref.stickerId || !ref.handle) return;
+        const { x: pctX, y: pctY } = toPct(getCoords(ev).x, getCoords(ev).y);
+        const l = ref.startLayout;
+        const k = ref.aspectK;
+        const { x: newX, y: newY, w: newW, h: newH } = resizeLayoutKeepImageAspect(
+          ref.handle,
+          l,
+          pctX,
+          pctY,
+          k,
+          SPREAD_LAYOUT_MIN,
+          SPREAD_LAYOUT_MAX
+        );
+        setLayouts((prev) => ({
+          ...prev,
+          [ref.stickerId]: { ...(prev[ref.stickerId] || l), x: newX, y: newY, w: newW, h: newH },
+        }));
+      };
+      const onUp = async () => {
+        setResizingId(null);
+        const sid = resizeRef.current.stickerId;
+        resizeRef.current = { stickerId: null, handle: null, startLayout: null, aspectK: 1 };
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        window.removeEventListener("touchmove", onMove);
+        window.removeEventListener("touchend", onUp);
+        if (sid) {
+          const lay = layoutsRef.current[sid];
+          if (lay) await onPersistLayout(sid, lay);
+        }
+      };
+      const opts = { passive: false };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      window.addEventListener("touchmove", onMove, opts);
+      window.addEventListener("touchend", onUp);
+    },
+    [getCoords, onSelectSticker, onPersistLayout]
+  );
+
+  const handleStickerPointerDown = useCallback(
+    (e, stickerId) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const { x: startX, y: startY } = getCoords(e);
+      const st = sorted.find((s) => s.id === stickerId);
+      const layout = layoutsRef.current[stickerId] || (st ? layoutFromSticker(st) : layoutFromSticker({}));
+      dragRef.current = {
+        id: stickerId,
+        startX,
+        startY,
+        startLayout: { ...layout },
+        dragStarted: false,
+      };
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const onMove = (ev) => {
+        ev.preventDefault();
+        const ref = dragRef.current;
+        if (!ref.id) return;
+        const { x, y } = getCoords(ev);
+        const dist = Math.hypot(x - ref.startX, y - ref.startY);
+        if (!ref.dragStarted) {
+          if (dist > 5) ref.dragStarted = true;
+          else return;
+        }
+        setDraggingId(ref.id);
+        const dx = ((x - ref.startX) / rect.width) * 100;
+        const dy = ((y - ref.startY) / rect.height) * 100;
+        const l = ref.startLayout;
+        let newX = l.x + dx;
+        let newY = l.y + dy;
+        newX = Math.max(0, Math.min(SPREAD_LAYOUT_MAX - l.w, newX));
+        newY = Math.max(0, Math.min(SPREAD_LAYOUT_MAX - l.h, newY));
+        const guides = { vertical: [], horizontal: [] };
+        const currentLayouts = layoutsRef.current;
+        const otherIds = sorted.filter((s) => s.id !== ref.id).map((s) => s.id);
+        const vTargets = [0, 50, SPREAD_LAYOUT_MAX];
+        const hTargets = [0, 50, SPREAD_LAYOUT_MAX];
+        otherIds.forEach((oid) => {
+          const o = currentLayouts[oid];
+          if (o && typeof o.x === "number") {
+            vTargets.push(o.x, o.x + (o.w || 0) / 2, o.x + (o.w || 0));
+            hTargets.push(o.y, o.y + (o.h || 0) / 2, o.y + (o.h || 0));
+          }
+        });
+        const dragLeft = newX;
+        const dragCenterX = newX + (l.w || 0) / 2;
+        const dragRight = newX + (l.w || 0);
+        const dragTop = newY;
+        const dragCenterY = newY + (l.h || 0) / 2;
+        const dragBottom = newY + (l.h || 0);
+        let bestV = null;
+        let bestVAnchor = 0;
+        let bestVDist = SPREAD_SNAP_THRESHOLD;
+        vTargets.forEach((t) => {
+          const dLeft = Math.abs(dragLeft - t);
+          const dCenter = Math.abs(dragCenterX - t);
+          const dRight = Math.abs(dragRight - t);
+          if (dLeft < bestVDist) {
+            bestVDist = dLeft;
+            bestV = t;
+            bestVAnchor = 0;
+          }
+          if (dCenter < bestVDist) {
+            bestVDist = dCenter;
+            bestV = t;
+            bestVAnchor = 1;
+          }
+          if (dRight < bestVDist) {
+            bestVDist = dRight;
+            bestV = t;
+            bestVAnchor = 2;
+          }
+        });
+        let bestH = null;
+        let bestHAnchor = 0;
+        let bestHDist = SPREAD_SNAP_THRESHOLD;
+        hTargets.forEach((t) => {
+          const dTop = Math.abs(dragTop - t);
+          const dCenter = Math.abs(dragCenterY - t);
+          const dBottom = Math.abs(dragBottom - t);
+          if (dTop < bestHDist) {
+            bestHDist = dTop;
+            bestH = t;
+            bestHAnchor = 0;
+          }
+          if (dCenter < bestHDist) {
+            bestHDist = dCenter;
+            bestH = t;
+            bestHAnchor = 1;
+          }
+          if (dBottom < bestHDist) {
+            bestHDist = dBottom;
+            bestH = t;
+            bestHAnchor = 2;
+          }
+        });
+        if (bestV != null) {
+          guides.vertical.push(bestV);
+          const offset = bestVAnchor === 0 ? 0 : bestVAnchor === 1 ? (l.w || 0) / 2 : l.w || 0;
+          newX = Math.max(0, Math.min(SPREAD_LAYOUT_MAX - (l.w || 0), bestV - offset));
+        }
+        if (bestH != null) {
+          guides.horizontal.push(bestH);
+          const offset = bestHAnchor === 0 ? 0 : bestHAnchor === 1 ? (l.h || 0) / 2 : l.h || 0;
+          newY = Math.max(0, Math.min(SPREAD_LAYOUT_MAX - (l.h || 0), bestH - offset));
+        }
+        setGuideLines(guides);
+        setLayouts((prev) => ({
+          ...prev,
+          [ref.id]: { ...(prev[ref.id] || l), x: newX, y: newY },
+        }));
+      };
+      const onUp = async () => {
+        const ref = dragRef.current;
+        dragRef.current = { id: null, startX: 0, startY: 0, startLayout: null, dragStarted: false };
+        setDraggingId(null);
+        setGuideLines({ vertical: [], horizontal: [] });
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+        window.removeEventListener("touchmove", onMove);
+        window.removeEventListener("touchend", onUp);
+        window.removeEventListener("touchcancel", onUp);
+        if (!ref.id) return;
+        if (!ref.dragStarted) {
+          if (selectedStickerId === ref.id) onSelectSticker(null);
+          else onSelectSticker(ref.id);
+        } else {
+          const lay = layoutsRef.current[ref.id];
+          if (lay) await onPersistLayout(ref.id, lay);
+        }
+      };
+      const opts = { passive: false };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+      window.addEventListener("touchmove", onMove, opts);
+      window.addEventListener("touchend", onUp);
+      window.addEventListener("touchcancel", onUp);
+    },
+    [getCoords, onSelectSticker, onPersistLayout, selectedStickerId, sorted]
+  );
+
+  const renderOrder = useMemo(() => {
+    if (!selectedStickerId) return sorted;
+    const idx = sorted.findIndex((s) => s.id === selectedStickerId);
+    if (idx < 0) return sorted;
+    const next = [...sorted];
+    const [sel] = next.splice(idx, 1);
+    next.push(sel);
+    return next;
+  }, [sorted, selectedStickerId]);
+
+  if (!sorted.length) return null;
+
+  return (
+    <div ref={containerRef} className={`${styles.pagePhotosAbsolute} ${styles.studioSpreadStickersLayer}`}>
+      {(guideLines.vertical.length > 0 || guideLines.horizontal.length > 0) && (
+        <div className={`${styles.editorGuideLines} ${styles.spreadGuideLines}`} aria-hidden>
+          {guideLines.vertical.map((xv) => (
+            <div key={`sv-${xv}`} className={styles.editorGuideLineV} style={{ left: `${xv}%` }} />
+          ))}
+          {guideLines.horizontal.map((yh) => (
+            <div key={`sh-${yh}`} className={styles.editorGuideLineH} style={{ top: `${yh}%` }} />
+          ))}
+        </div>
+      )}
+      {renderOrder.map((s) => {
+        const layout = layouts[s.id] || layoutFromSticker(s);
+        const rot = layout.rotation ?? 0;
+        const isSelected = selectedStickerId === s.id;
+        const imgUrl = getElementUrl(s.path);
+        return (
+          <div
+            key={s.id}
+            className={
+              styles.editorPhotoOuter +
+              (isSelected ? " " + styles.editorPhotoSelectedOuter : "") +
+              (isSelected ? " " + styles.studioSpreadPhotoRaised : "") +
+              (resizingId === s.id ? " " + styles.editorPhotoResizingOuter : "")
+            }
+            style={{
+              left: `${layout.x}%`,
+              top: `${layout.y}%`,
+              width: `${layout.w}%`,
+              height: `${layout.h}%`,
+              transform: rot ? `rotate(${rot}deg)` : undefined,
+            }}
+          >
+            <div
+              className={
+                styles.editorPhoto +
+                (draggingId === s.id ? " " + styles.editorPhotoDragging : "") +
+                (isSelected ? " " + styles.editorPhotoSelected : "") +
+                (resizingId === s.id ? " " + styles.editorPhotoResizing : "")
+              }
+              onMouseDown={(e) => !resizingId && handleStickerPointerDown(e, s.id)}
+              onTouchStart={(e) => !resizingId && handleStickerPointerDown(e, s.id)}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={imgUrl}
+                alt=""
+                className={styles.stickerImg}
+                draggable={false}
+                onLoad={(e) => {
+                  const im = e.currentTarget;
+                  if (im.naturalWidth > 0 && im.naturalHeight > 0) {
+                    naturalAspectByStickerRef.current[s.id] = { width: im.naturalWidth, height: im.naturalHeight };
+                  }
+                }}
+              />
+            </div>
+            {isSelected && (
+              <>
+                {["nw", "ne", "sw", "se"].map((h) => (
+                  <div
+                    key={h}
+                    className={styles.editorResizeHandle}
+                    data-handle={h}
+                    onMouseDown={(ev) => {
+                      ev.stopPropagation();
+                      handleResizeStart(ev, s.id, h);
+                    }}
+                    onTouchStart={(ev) => {
+                      ev.stopPropagation();
+                      handleResizeStart(ev, s.id, h);
+                    }}
+                    aria-label={`שינוי גודל ${h}`}
+                  />
+                ))}
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function AlbumSpread({
   leftPage,
   rightPage,
@@ -2546,6 +3007,9 @@ function AlbumSpread({
   studioPhotoSel,
   onStudioSelectPhoto,
   onPersistSpreadPhotoLayout,
+  studioStickerSel,
+  onStudioSelectSticker,
+  onPersistSpreadStickerLayout,
   studioTextSel,
   studioEditingTextId,
   onStudioTextSelect,
@@ -2624,7 +3088,18 @@ function AlbumSpread({
               showRemoveButton={false}
             />
           )}
-          {getElementUrl && <PageStickers stickers={stickersLeft} getElementUrl={getElementUrl} />}
+          {getElementUrl && !studio && <PageStickers stickers={stickersLeft} getElementUrl={getElementUrl} />}
+          {studio && leftPage && getElementUrl && (
+            <StudioSpreadStickers
+              stickers={stickersLeft}
+              getElementUrl={getElementUrl}
+              selectedStickerId={studioStickerSel?.pageId === leftPage.id ? studioStickerSel.stickerId : null}
+              onSelectSticker={(stickerId) =>
+                onStudioSelectSticker?.(stickerId ? { pageId: leftPage.id, stickerId } : null)
+              }
+              onPersistLayout={(stickerId, layout) => onPersistSpreadStickerLayout?.(leftPage.id, stickerId, layout)}
+            />
+          )}
           {studio && leftPage ? (
             <StudioSpreadTexts
               pageId={leftPage.id}
@@ -2712,7 +3187,18 @@ function AlbumSpread({
               showRemoveButton={false}
             />
           )}
-          {getElementUrl && <PageStickers stickers={stickersRight} getElementUrl={getElementUrl} />}
+          {getElementUrl && !studio && <PageStickers stickers={stickersRight} getElementUrl={getElementUrl} />}
+          {studio && rightPage && getElementUrl && (
+            <StudioSpreadStickers
+              stickers={stickersRight}
+              getElementUrl={getElementUrl}
+              selectedStickerId={studioStickerSel?.pageId === rightPage.id ? studioStickerSel.stickerId : null}
+              onSelectSticker={(stickerId) =>
+                onStudioSelectSticker?.(stickerId ? { pageId: rightPage.id, stickerId } : null)
+              }
+              onPersistLayout={(stickerId, layout) => onPersistSpreadStickerLayout?.(rightPage.id, stickerId, layout)}
+            />
+          )}
           {studio && rightPage ? (
             <StudioSpreadTexts
               pageId={rightPage.id}
@@ -2792,6 +3278,7 @@ export default function EditPages() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [activePageId, setActivePageId] = useState(null);
   const [studioPhotoSel, setStudioPhotoSel] = useState(null);
+  const [studioStickerSel, setStudioStickerSel] = useState(null);
   const [showStudioCropSheet, setShowStudioCropSheet] = useState(false);
   const [studioCropDraft, setStudioCropDraft] = useState(() => ({ ...DEFAULT_PHOTO_CROP }));
   const studioCropDraftRef = useRef({ ...DEFAULT_PHOTO_CROP });
@@ -2800,6 +3287,8 @@ export default function EditPages() {
   const [studioSpreadFontSizeLive, setStudioSpreadFontSizeLive] = useState(null);
   const [showLayoutSheet, setShowLayoutSheet] = useState(false);
   const [showBgSheet, setShowBgSheet] = useState(false);
+  const [showStickersSheet, setShowStickersSheet] = useState(false);
+  const [studioElementsList, setStudioElementsList] = useState([]);
   const [showQrSheet, setShowQrSheet] = useState(false);
   const [showAllPagesSheet, setShowAllPagesSheet] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -2821,6 +3310,10 @@ export default function EditPages() {
   useEffect(() => {
     getAlbum(id).then(setAlbum).catch((e) => setError(e.message));
   }, [id]);
+
+  useEffect(() => {
+    getElementsList().then(setStudioElementsList).catch(() => setStudioElementsList([]));
+  }, []);
 
   async function handleFinishAndDownload() {
     setGeneratingPdf(true);
@@ -2867,6 +3360,7 @@ export default function EditPages() {
 
   useEffect(() => {
     setStudioPhotoSel(null);
+    setStudioStickerSel(null);
     setStudioTextSel(null);
     setStudioEditingTextId(null);
     setStudioSpreadFontSizeLive(null);
@@ -3070,6 +3564,41 @@ export default function EditPages() {
     }
   }
 
+  async function studioAddSticker(path) {
+    if (!path) return;
+    const pid = activePageId || leftPage?.id;
+    if (!pid || viewIndex === 0) {
+      setError("בחרו עמוד פעיל (הקישו על אחד משני עמודי השיפוע).");
+      return;
+    }
+    const page = pages.find((p) => p.id === pid);
+    if (!page) return;
+    pushUndoSnapshot(pid);
+    const stickerId = "s-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
+    const prevStickers = Array.isArray(page.page_config?.stickers) ? page.page_config.stickers : [];
+    try {
+      setError(null);
+      await updatePageConfig(id, pid, {
+        ...(page.page_config || {}),
+        stickers: [
+          ...prevStickers,
+          { id: stickerId, path, x: 15, y: 15, w: STICKER_DEFAULT_SIZE, h: STICKER_DEFAULT_SIZE, rotation: 0 },
+        ],
+      });
+      await refreshAlbum();
+      setShowStickersSheet(false);
+      setStudioPhotoSel(null);
+      setStudioTextSel(null);
+      setStudioEditingTextId(null);
+      setStudioSpreadFontSizeLive(null);
+      setStudioStickerSel({ pageId: pid, stickerId });
+    } catch (e) {
+      undoConfigStack.current.pop();
+      setUndoDepth(undoConfigStack.current.length);
+      setError(e.message);
+    }
+  }
+
   async function addStudioText() {
     const pid = activePageId || leftPage?.id;
     if (!pid || viewIndex === 0) {
@@ -3221,6 +3750,47 @@ export default function EditPages() {
       await updatePhotoLayout(id, photoId, layout);
       await refreshAlbum();
     } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handlePersistSpreadStickerLayout(pageId, stickerId, layout) {
+    const page = album?.pages?.find((p) => p.id === pageId);
+    if (!page) return;
+    try {
+      setError(null);
+      const cfg = { ...(page.page_config || {}) };
+      const list = [...(cfg.stickers || [])];
+      const idx = list.findIndex((s) => s.id === stickerId);
+      if (idx < 0) return;
+      list[idx] = {
+        ...list[idx],
+        x: layout.x,
+        y: layout.y,
+        w: layout.w,
+        h: layout.h,
+        rotation: layout.rotation ?? list[idx].rotation ?? 0,
+      };
+      await updatePageConfig(id, pageId, { ...cfg, stickers: list });
+      await refreshAlbum();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function studioRemoveSticker(pageId, stickerId) {
+    const page = album?.pages?.find((p) => p.id === pageId);
+    if (!page) return;
+    pushUndoSnapshot(pageId);
+    try {
+      setError(null);
+      const stickers = (page.page_config?.stickers || []).filter((s) => s.id !== stickerId);
+      await updatePageConfig(id, pageId, { ...(page.page_config || {}), stickers });
+      await refreshAlbum();
+      setStudioStickerSel((prev) => (prev?.pageId === pageId && prev?.stickerId === stickerId ? null : prev));
+    } catch (e) {
+      undoConfigStack.current.pop();
+      setUndoDepth(undoConfigStack.current.length);
       setError(e.message);
     }
   }
@@ -3480,65 +4050,66 @@ export default function EditPages() {
           עמוד פעיל לכלים: <strong>{activePageOrderLabel != null ? `#${activePageOrderLabel}` : "—"}</strong>
           {studioUploading
             ? " · מעלה תמונות…"
-            : " · תמונה: בחירה ופינות לגודל. טקסט: גרירה, לחיצה כפולה לעריכה."}
+            : " · תמונה ואלמנט: בחירה, גרירה ופינות לגודל. טקסט: גרירה, לחיצה כפולה לעריכה."}
         </p>
       )}
 
       <div className={styles.studioSpreadWrap}>
-        <div className={styles.studioPageNav}>
-          <button
-            type="button"
-            className={styles.studioNavLink}
-            disabled={viewIndex === 0}
-            onClick={() => setViewIndex((i) => Math.max(0, i - 1))}
-          >
-            ‹ עמוד קודם
-          </button>
-          <div className={styles.studioPageSelectWrap}>
-            <select
-              className={styles.studioPageSelect}
-              value={viewIndex}
-              aria-label="בחירת עמוד או כריכה"
-              onChange={(e) => setViewIndex(Number(e.target.value))}
+        <div className={styles.studioSpreadTop}>
+          <div className={styles.studioPageNav}>
+            <button
+              type="button"
+              className={styles.studioNavLink}
+              disabled={viewIndex === 0}
+              onClick={() => setViewIndex((i) => Math.max(0, i - 1))}
             >
-              <option value={0}>כריכה</option>
-              {Array.from({ length: spreadCount }, (_, i) => {
-                const a = i * 2 + 1;
-                const b = Math.min(i * 2 + 2, pages.length);
-                const lab = b > a ? `עמודים ${a}–${b}` : `עמוד ${a}`;
-                return (
-                  <option key={i} value={i + 1}>
-                    {lab}
-                  </option>
-                );
-              })}
-            </select>
+              ‹ עמוד קודם
+            </button>
+            <div className={styles.studioPageSelectWrap}>
+              <select
+                className={styles.studioPageSelect}
+                value={viewIndex}
+                aria-label="בחירת עמוד או כריכה"
+                onChange={(e) => setViewIndex(Number(e.target.value))}
+              >
+                <option value={0}>כריכה</option>
+                {Array.from({ length: spreadCount }, (_, i) => {
+                  const a = i * 2 + 1;
+                  const b = Math.min(i * 2 + 2, pages.length);
+                  const lab = b > a ? `עמודים ${a}–${b}` : `עמוד ${a}`;
+                  return (
+                    <option key={i} value={i + 1}>
+                      {lab}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <button
+              type="button"
+              className={styles.studioNavLink}
+              disabled={viewIndex >= viewCount - 1}
+              onClick={() => setViewIndex((i) => Math.min(viewCount - 1, i + 1))}
+            >
+              עמוד הבא ›
+            </button>
           </div>
-          <button
-            type="button"
-            className={styles.studioNavLink}
-            disabled={viewIndex >= viewCount - 1}
-            onClick={() => setViewIndex((i) => Math.min(viewCount - 1, i + 1))}
-          >
-            עמוד הבא ›
-          </button>
+          {viewIndex > 0 && studioToolbarModel && (
+            <StudioTextToolbar
+              text={studioToolbarModel.text}
+              onPatch={(partial) =>
+                studioPatchText(studioToolbarModel.page.id, studioToolbarModel.text.id, partial, { skipUndo: true })
+              }
+              onLiveFontSizeChange={setStudioSpreadFontSizeLive}
+              onRemove={() => studioRemoveSelectedText()}
+              onDismiss={() => {
+                setStudioTextSel(null);
+                setStudioEditingTextId(null);
+                setStudioSpreadFontSizeLive(null);
+              }}
+            />
+          )}
         </div>
-
-        {viewIndex > 0 && studioToolbarModel && (
-          <StudioTextToolbar
-            text={studioToolbarModel.text}
-            onPatch={(partial) =>
-              studioPatchText(studioToolbarModel.page.id, studioToolbarModel.text.id, partial, { skipUndo: true })
-            }
-            onLiveFontSizeChange={setStudioSpreadFontSizeLive}
-            onRemove={() => studioRemoveSelectedText()}
-            onDismiss={() => {
-              setStudioTextSel(null);
-              setStudioEditingTextId(null);
-              setStudioSpreadFontSizeLive(null);
-            }}
-          />
-        )}
 
         <div className={viewIndex === 0 ? styles.studioCoverCard : styles.studioSpreadFrame}>
           {viewIndex > 0 && studioPhotoSel && (
@@ -3552,6 +4123,17 @@ export default function EditPages() {
                 onClick={() => studioRemoveSelectedPhoto()}
               >
                 מחק תמונה
+              </button>
+            </div>
+          )}
+          {viewIndex > 0 && studioStickerSel && (
+            <div className={styles.studioPhotoSelectionBar} role="toolbar" aria-label="אלמנט נבחר">
+              <button
+                type="button"
+                className={`${styles.studioPhotoSelectionBarBtn} ${styles.studioPhotoSelectionBarBtnDanger}`}
+                onClick={() => studioRemoveSticker(studioStickerSel.pageId, studioStickerSel.stickerId)}
+              >
+                הסר אלמנט
               </button>
             </div>
           )}
@@ -3573,6 +4155,7 @@ export default function EditPages() {
                 activePageId={activePageId}
                 onStudioPageBackground={(pageId) => {
                   setStudioPhotoSel(null);
+                  setStudioStickerSel(null);
                   setStudioTextSel(null);
                   setStudioEditingTextId(null);
                   setStudioSpreadFontSizeLive(null);
@@ -3581,16 +4164,27 @@ export default function EditPages() {
                 onStudioTapAddPhotos={(pageId) => openStudioPhotoPicker(pageId)}
                 studioPhotoSel={studioPhotoSel}
                 onStudioSelectPhoto={(sel) => {
+                  setStudioStickerSel(null);
                   setStudioTextSel(null);
                   setStudioEditingTextId(null);
                   setStudioSpreadFontSizeLive(null);
                   setStudioPhotoSel(sel);
                 }}
                 onPersistSpreadPhotoLayout={handlePersistSpreadPhotoLayout}
+                studioStickerSel={studioStickerSel}
+                onStudioSelectSticker={(sel) => {
+                  setStudioPhotoSel(null);
+                  setStudioTextSel(null);
+                  setStudioEditingTextId(null);
+                  setStudioSpreadFontSizeLive(null);
+                  setStudioStickerSel(sel);
+                }}
+                onPersistSpreadStickerLayout={handlePersistSpreadStickerLayout}
                 studioTextSel={studioTextSel}
                 studioEditingTextId={studioEditingTextId}
                 onStudioTextSelect={(pageId, textId) => {
                   setStudioPhotoSel(null);
+                  setStudioStickerSel(null);
                   setStudioTextSel(textId ? { pageId, textId } : null);
                   if (!textId) setStudioEditingTextId(null);
                 }}
@@ -3619,26 +4213,42 @@ export default function EditPages() {
                 else setError("בחרו עמוד.");
               }}
             >
-              <span className={styles.studioDockIcon} aria-hidden>🖼</span>
+              <span className={styles.studioDockIcon}>
+                <StudioDockIconPhoto />
+              </span>
               <span className={styles.studioDockLabel}>תמונות</span>
             </button>
             <button type="button" className={styles.studioDockItem} onClick={() => setShowLayoutSheet(true)}>
-              <span className={styles.studioDockIcon} aria-hidden>▦</span>
+              <span className={styles.studioDockIcon}>
+                <StudioDockIconLayout />
+              </span>
               <span className={styles.studioDockLabel}>פריסות</span>
             </button>
             <button type="button" className={styles.studioDockItem} onClick={() => setShowBgSheet(true)}>
-              <span className={styles.studioDockIcon} aria-hidden>▨</span>
+              <span className={styles.studioDockIcon}>
+                <StudioDockIconBackground />
+              </span>
               <span className={styles.studioDockLabel}>רקעים</span>
             </button>
+            <button type="button" className={styles.studioDockItem} onClick={() => setShowStickersSheet(true)}>
+              <span className={styles.studioDockIcon}>
+                <StudioDockIconElements />
+              </span>
+              <span className={styles.studioDockLabel}>אלמנטים</span>
+            </button>
             <button type="button" className={styles.studioDockItem} onClick={() => openShareQrSheet()}>
-              <span className={styles.studioDockIcon} aria-hidden>⬛</span>
+              <span className={styles.studioDockIcon}>
+                <StudioDockIconQr />
+              </span>
               <span className={styles.studioDockLabel}>QR</span>
             </button>
             <button type="button" className={styles.studioDockItem} onClick={() => addStudioText()}>
-              <span className={styles.studioDockIcon} aria-hidden>T</span>
+              <span className={styles.studioDockIcon}>
+                <StudioDockIconText />
+              </span>
               <span className={styles.studioDockLabel}>טקסט</span>
-        </button>
-      </div>
+            </button>
+          </div>
         </div>
       )}
 
@@ -3760,6 +4370,42 @@ export default function EditPages() {
             >
               החלת רקע
             </button>
+          </div>
+        </div>
+      )}
+
+      {showStickersSheet && (
+        <div className={styles.studioSheetBackdrop} onClick={() => setShowStickersSheet(false)} role="presentation">
+          <div className={`${styles.studioSheet} ${styles.studioStickersSheet}`} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.studioSheetHeader}>
+              <h3 className={styles.studioSheetTitle}>אלמנטים מוכנים</h3>
+              <button type="button" className={styles.studioSheetClose} onClick={() => setShowStickersSheet(false)} aria-label="סגור">
+                ×
+              </button>
+            </div>
+            <p style={{ fontSize: "0.85rem", color: "#6b7280", marginTop: 0 }}>
+              נוספים לעמוד הפעיל. בחרו אלמנט בשיפוע, גררו להזזה, וגררו את הפינות לשינוי גודל (יחס גובה־רוחב נשמר כמו בתמונה).
+            </p>
+            <div className={styles.studioStickersSheetBody}>
+              {studioElementsList.length === 0 ? (
+                <p className={styles.stickerPickerHint}>טוען... או הוסיפו קבצים ל־bucket ״elements״ ב־Storage.</p>
+              ) : (
+                <div className={styles.stickerPickerRow}>
+                  {studioElementsList.map((c) => (
+                    <button
+                      key={c.path}
+                      type="button"
+                      className={styles.stickerPickerBtn}
+                      onClick={() => studioAddSticker(c.path)}
+                      title={c.path}
+                      aria-label={c.path}
+                    >
+                      <img src={getElementUrl(c.path)} alt="" className={styles.stickerPickerImg} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
