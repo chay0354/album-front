@@ -17,8 +17,8 @@ import {
   getElementsList,
   getElementUrl,
 } from "../api";
-import { createRoot } from "react-dom/client";
 import html2canvas from "html2canvas";
+import { toJpeg, getFontEmbedCSS } from "html-to-image";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
@@ -422,139 +422,68 @@ function setMinimalDragImage(e) {
   setTimeout(() => el.remove(), 0);
 }
 
-const PDF_PAGE_W = 595;
-const PDF_PAGE_H = 842;
-const PDF_CAPTURE_TEXT_SCALE = PDF_PAGE_W / 420;
+const PDF_OUT_W = 595;
+const PDF_OUT_H = 842;
 
-/** Renders a single page at PDF size (595×842) for html2canvas capture. Hebrew renders via browser fonts. */
-function PdfPageCapture({ type, album, coverUrl, page, getPhotoUrl, getElementUrl }) {
-  if (type === "cover") {
-    const cfg = album?.cover_config || {};
-    const texts = Array.isArray(cfg.texts) && cfg.texts.length > 0
-      ? cfg.texts
-      : cfg.headerText
-        ? [{ content: cfg.headerText, x: cfg.headerX ?? 50, y: cfg.headerY ?? 18, fontSize: cfg.headerFontSize ?? 28, color: "#ffffff" }]
-        : [];
-    const coverStyle = coverUrl
-      ? { backgroundImage: `url("${coverUrl}")`, backgroundSize: "cover", backgroundPosition: "center" }
-      : { backgroundColor: "#333" };
-    return (
-      <div
-        style={{
-          width: PDF_PAGE_W,
-          height: PDF_PAGE_H,
-          position: "relative",
-          overflow: "hidden",
-          ...coverStyle,
-        }}
-      >
-        {texts.map((t, i) => (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: `${t.x ?? 50}%`,
-              top: `${t.y ?? 18}%`,
-              transform: "translate(-50%, -50%)",
-              fontSize: `${Math.round((t.fontSize ?? 28) * PDF_CAPTURE_TEXT_SCALE)}px`,
-              color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
-              fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
-              fontWeight: 600,
-            }}
-          >
-            {t.content}
-          </div>
-        ))}
-      </div>
-    );
+/** Snapshot visible DOM (what the user sees) → JPEG scaled to PDF page size. Uses html-to-image (SVG) so Hebrew matches the screen. */
+async function captureVisibleElementToPdfJpeg(el, fontEmbedCSS) {
+  if (!el || !(el instanceof HTMLElement)) throw new Error("PDF capture: no element");
+
+  await document.fonts.ready;
+  await new Promise((r) => requestAnimationFrame(r));
+  await new Promise((r) => requestAnimationFrame(r));
+
+  const pr = Math.min(3, Math.max(2, Math.ceil(960 / Math.max(1, el.offsetWidth))));
+
+  let dataUrl;
+  try {
+    dataUrl = await toJpeg(el, {
+      quality: 0.9,
+      pixelRatio: pr,
+      cacheBust: true,
+      backgroundColor: "#ffffff",
+      skipFonts: false,
+      ...(fontEmbedCSS ? { fontEmbedCSS } : {}),
+    });
+  } catch (e1) {
+    console.warn("[PDF] toJpeg failed, falling back to html2canvas:", e1?.message || e1);
+    const canvas = await html2canvas(el, {
+      scale: pr,
+      useCORS: true,
+      foreignObjectRendering: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+      imageTimeout: 20000,
+      scrollX: 0,
+      scrollY: -window.scrollY,
+    });
+    dataUrl = canvas.toDataURL("image/jpeg", 0.9);
   }
 
-  // Internal page
-  const photos = (page?.album_photos || []).sort((a, b) => a.photo_order - b.photo_order);
-  const cfg = page?.page_config || {};
-  const texts = Array.isArray(cfg.texts) ? cfg.texts : [];
-  const stickers = Array.isArray(cfg.stickers) ? cfg.stickers : [];
-  const hasLayout = photos.some((p) => p.layout && typeof p.layout.x === "number");
+  const img = new Image();
+  await new Promise((resolve, reject) => {
+    img.onload = resolve;
+    img.onerror = () => reject(new Error("PDF capture: image decode failed"));
+    img.src = dataUrl;
+  });
 
-  return (
-    <div
-      style={{
-        width: PDF_PAGE_W,
-        height: PDF_PAGE_H,
-        position: "relative",
-        backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(cfg.backgroundColor) ? cfg.backgroundColor : "#ffffff",
-        overflow: "hidden",
-      }}
-    >
-      {/* Photos */}
-      <div style={{ position: "absolute", inset: 0 }}>
-        {photos.map((p, i) => {
-          const layout = p.layout && typeof p.layout.x === "number" ? p.layout : DEFAULT_LAYOUT(i);
-          const rot = layout.rotation ?? 0;
-          return (
-            <div
-              key={p.id}
-              style={{
-                position: "absolute",
-                left: `${layout.x}%`,
-                top: `${layout.y}%`,
-                width: `${layout.w ?? 46}%`,
-                height: `${layout.h ?? 46}%`,
-                transform: rot ? `rotate(${rot}deg)` : undefined,
-              }}
-            >
-              <img
-                src={getPhotoUrl(p.storage_path)}
-                alt=""
-                crossOrigin="anonymous"
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
-              />
-            </div>
-          );
-        })}
-      </div>
-      {/* Stickers */}
-      {stickers.map((s) => {
-        if (!s.path) return null;
-        return (
-          <div
-            key={s.id}
-            style={{
-              position: "absolute",
-              left: `${s.x ?? 10}%`,
-              top: `${s.y ?? 10}%`,
-              width: `${s.w ?? 12}%`,
-              height: `${s.h ?? 12}%`,
-              transform: (s.rotation ?? 0) ? `rotate(${s.rotation}deg)` : undefined,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <img src={getElementUrl(s.path)} alt="" crossOrigin="anonymous" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
-          </div>
-        );
-      })}
-      {/* Texts */}
-      {texts.map((t, i) => (
-        <div
-          key={t.id || i}
-          style={{
-            position: "absolute",
-            left: `${t.x ?? 50}%`,
-            top: `${t.y ?? 25}%`,
-            transform: "translate(-50%, -50%)",
-            fontSize: `${Math.round((t.fontSize ?? 28) * PDF_CAPTURE_TEXT_SCALE)}px`,
-            color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#000",
-            fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
-            fontWeight: 600,
-          }}
-        >
-          {t.content}
-        </div>
-      ))}
-    </div>
-  );
+  const out = document.createElement("canvas");
+  out.width = PDF_OUT_W;
+  out.height = PDF_OUT_H;
+  const ctx = out.getContext("2d");
+  if (!ctx) throw new Error("PDF capture: no canvas context");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, PDF_OUT_W, PDF_OUT_H);
+  const nw = img.naturalWidth;
+  const nh = img.naturalHeight;
+  if (nw < 1 || nh < 1) throw new Error("PDF capture: empty snapshot");
+  const scale = Math.min(PDF_OUT_W / nw, PDF_OUT_H / nh);
+  const dw = nw * scale;
+  const dh = nh * scale;
+  const dx = (PDF_OUT_W - dw) / 2;
+  const dy = (PDF_OUT_H - dh) / 2;
+  ctx.drawImage(img, 0, 0, nw, nh, dx, dy, dw, dh);
+  return out.toDataURL("image/jpeg", 0.88);
 }
 
 function AlbumCover({ album, coverUrl }) {
@@ -568,7 +497,7 @@ function AlbumCover({ album, coverUrl }) {
     ? { backgroundImage: `url("${coverUrl}")`, background: `center/cover no-repeat url("${coverUrl}")` }
     : {};
   return (
-    <div className={styles.coverSingle} style={coverStyle}>
+    <div className={styles.coverSingle} style={coverStyle} data-pdf-capture="cover">
       <div className={styles.coverOverlay} />
       {texts.map((t, i) => (
         <div
@@ -3203,6 +3132,7 @@ function AlbumSpread({
           onDragLeave={() => setDragOverLeft(false)}
           onDrop={(e) => handleDrop(e, leftPage?.id)}
           data-page-id={leftPage?.id}
+          {...(studio ? { "data-pdf-capture": "left" } : {})}
           onClick={(e) => halfClick(e, leftPage)}
           role="presentation"
         >
@@ -3302,6 +3232,7 @@ function AlbumSpread({
           onDragLeave={() => setDragOverRight(false)}
           onDrop={(e) => handleDrop(e, rightPage?.id)}
           data-page-id={rightPage?.id}
+          {...(studio ? { "data-pdf-capture": "right" } : {})}
           onClick={(e) => halfClick(e, rightPage)}
           role="presentation"
         >
@@ -3454,48 +3385,68 @@ export default function EditPages() {
   async function handleFinishAndDownload() {
     setGeneratingPdf(true);
     setError(null);
-    try {
-      const pages = album?.pages || [];
-      const captureItems = [{ type: "cover", album, coverUrl }];
-      for (const p of pages) {
-        const photos = (p.album_photos || []).sort((a, b) => a.photo_order - b.photo_order);
-        const texts = Array.isArray(p.page_config?.texts) ? p.page_config.texts : [];
-        if (photos.length > 0 || texts.length > 0) captureItems.push({ type: "page", page: p });
-      }
+    setShowMoreMenu(false);
 
-      const container = document.createElement("div");
-      container.style.cssText = "position:fixed;left:-9999px;top:0;width:595px;height:842px;overflow:visible;";
-      document.body.appendChild(container);
-      const root = createRoot(container);
+    const pagesSorted = [...(album?.pages || [])].sort((a, b) => (a.page_order ?? 0) - (b.page_order ?? 0));
+    const captureSteps = [{ kind: "cover" }];
+    pagesSorted.forEach((p, pageIndex) => {
+      const photos = (p.album_photos || []).sort((a, b) => a.photo_order - b.photo_order);
+      const texts = Array.isArray(p.page_config?.texts) ? p.page_config.texts : [];
+      if (photos.length === 0 && texts.length === 0) return;
+      captureSteps.push({
+        kind: "half",
+        pageIndex,
+        side: pageIndex % 2 === 0 ? "left" : "right",
+        spreadViewIndex: Math.floor(pageIndex / 2) + 1,
+      });
+    });
+
+    const saved = {
+      viewIndex,
+      activePageId,
+      studioPhotoSel,
+      studioStickerSel,
+      studioTextSel,
+      studioEditingTextId,
+    };
+
+    document.body.classList.add("pdfCaptureMode");
+    try {
+      flushSync(() => {
+        setStudioPhotoSel(null);
+        setStudioStickerSel(null);
+        setStudioTextSel(null);
+        setStudioEditingTextId(null);
+        setStudioSpreadFontSizeLive(null);
+      });
+
+      let fontEmbedCSS = "";
+      try {
+        fontEmbedCSS = await getFontEmbedCSS(document.body);
+      } catch (_) {
+        /* optional; toJpeg still works */
+      }
 
       const images = [];
-      for (let i = 0; i < captureItems.length; i++) {
-        const item = captureItems[i];
-        root.render(
-          <PdfPageCapture
-            type={item.type}
-            album={album}
-            coverUrl={coverUrl}
-            page={item.page}
-            getPhotoUrl={getPhotoUrl}
-            getElementUrl={getElementUrl}
-          />
-        );
-        await new Promise((r) => setTimeout(r, 350));
-        const el = container.firstElementChild;
-        if (!el) throw new Error("Capture element missing");
-        const canvas = await html2canvas(el, {
-          scale: 1,
-          useCORS: true,
-          logging: false,
-          backgroundColor: "#ffffff",
-          imageTimeout: 12000,
-        });
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-        images.push(dataUrl);
+      for (const step of captureSteps) {
+        if (step.kind === "cover") {
+          flushSync(() => setViewIndex(0));
+        } else {
+          flushSync(() => setViewIndex(step.spreadViewIndex));
+        }
+
+        await document.fonts.ready;
+        await new Promise((r) => setTimeout(r, 150));
+        await new Promise((r) => requestAnimationFrame(r));
+        await new Promise((r) => requestAnimationFrame(r));
+
+        const selector =
+          step.kind === "cover" ? '[data-pdf-capture="cover"]' : `[data-pdf-capture="${step.side}"]`;
+        const el = document.querySelector(selector);
+        if (!el) throw new Error("לא נמצא תוכן לצילום PDF");
+
+        images.push(await captureVisibleElementToPdfJpeg(el, fontEmbedCSS));
       }
-      document.body.removeChild(container);
-      root.unmount();
 
       const { blob, pdfUrl } = await generatePdfFromImages(id, images);
       const objUrl = URL.createObjectURL(blob);
@@ -3508,6 +3459,15 @@ export default function EditPages() {
     } catch (e) {
       setError(e.message || "שגיאה ביצירת PDF");
     } finally {
+      document.body.classList.remove("pdfCaptureMode");
+      flushSync(() => {
+        setViewIndex(saved.viewIndex);
+        setActivePageId(saved.activePageId);
+        setStudioPhotoSel(saved.studioPhotoSel);
+        setStudioStickerSel(saved.studioStickerSel);
+        setStudioTextSel(saved.studioTextSel);
+        setStudioEditingTextId(saved.studioEditingTextId);
+      });
       setGeneratingPdf(false);
     }
   }

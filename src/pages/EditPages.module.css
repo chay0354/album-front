@@ -3317,3 +3317,21 @@
     text-align-last: center;
   }
 }
+
+/* PDF: hide chrome while snapshotting visible pages (text must match on-screen rendering) */
+:global(body.pdfCaptureMode) .studioStageIndicator,
+:global(body.pdfCaptureMode) .studioTopBar,
+:global(body.pdfCaptureMode) .studioActivePageHint,
+:global(body.pdfCaptureMode) .studioSpreadTop,
+:global(body.pdfCaptureMode) .studioPhotoSelectionBar,
+:global(body.pdfCaptureMode) .studioBottomDock,
+:global(body.pdfCaptureMode) .tapAddPhoto,
+:global(body.pdfCaptureMode) .tapAddPhotoCorner {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+:global(body.pdfCaptureMode) .halfPageActive {
+  box-shadow: var(--shadow), var(--shadow-strong) !important;
+  border-color: var(--surface3) !important;
+}
