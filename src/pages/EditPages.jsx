@@ -20,7 +20,7 @@ import { toJpeg } from "html-to-image";
 import { domToJpeg } from "modern-screenshot";
 import { buildPdfBlobFromJpegDataUrls } from "../pdfClient";
 import { saveLocalPdfBlob } from "../pdfLocalCache";
-import { stashPdfDataUrlForSession } from "../pdfSessionBridge";
+import { stashPdfDataUrlForSession, stashPdfBlobUrlForSession } from "../pdfSessionBridge";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
@@ -3458,13 +3458,14 @@ export default function EditPages() {
       const blob = buildPdfBlobFromJpegDataUrls(images);
       await saveLocalPdfBlob(id, blob).catch(() => {});
       await stashPdfDataUrlForSession(id, blob);
-      const objUrl = URL.createObjectURL(blob);
+      const pdfBlobUrl = URL.createObjectURL(blob);
+      stashPdfBlobUrlForSession(id, pdfBlobUrl);
       const a = document.createElement("a");
-      a.href = objUrl;
+      a.href = pdfBlobUrl;
       a.download = "album.pdf";
       a.click();
-      URL.revokeObjectURL(objUrl);
-      navigate(`/album/${id}/done`, { state: { clientPdf: true } });
+      /* Keep blob URL alive for Done page (iPhone often has no usable IDB/data-URL handoff). */
+      navigate(`/album/${id}/done`, { state: { pdfBlobUrl } });
     } catch (e) {
       setError(e.message || "שגיאה ביצירת PDF");
     } finally {

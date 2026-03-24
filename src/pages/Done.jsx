@@ -1,8 +1,8 @@
-import { useState, useEffect, useLayoutEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useParams, useLocation, Link } from "react-router-dom";
 import { getAlbum, updateAlbum } from "../api";
 import { getLocalPdfBlob } from "../pdfLocalCache";
-import { peekPdfDataUrlFromSession } from "../pdfSessionBridge";
+import { peekPdfDataUrlFromSession, peekPdfBlobUrlFromSession } from "../pdfSessionBridge";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import styles from "./Done.module.css";
@@ -15,40 +15,56 @@ function ensureShareToken(album) {
 
 export default function Done() {
   const { id } = useParams();
+  const { state } = useLocation();
+  const idbObjectUrlRef = useRef(null);
   const [album, setAlbum] = useState(null);
   const [shareUrl, setShareUrl] = useState("");
-  /** data: URL from session (immediate) or blob: from IndexedDB */
+  /** data: or blob: URL for download */
   const [pdfHref, setPdfHref] = useState(null);
   /** loading | ready | missing */
   const [pdfStatus, setPdfStatus] = useState("loading");
 
   useLayoutEffect(() => {
     if (!id) return;
-    const fromSession = peekPdfDataUrlFromSession(id);
-    if (fromSession) {
-      setPdfHref(fromSession);
+    const fromNav = state?.pdfBlobUrl;
+    if (fromNav && typeof fromNav === "string" && fromNav.startsWith("blob:")) {
+      setPdfHref(fromNav);
+      setPdfStatus("ready");
+      return;
+    }
+    const fromBlobSession = peekPdfBlobUrlFromSession(id);
+    if (fromBlobSession && fromBlobSession.startsWith("blob:")) {
+      setPdfHref(fromBlobSession);
+      setPdfStatus("ready");
+      return;
+    }
+    const fromDataSession = peekPdfDataUrlFromSession(id);
+    if (fromDataSession) {
+      setPdfHref(fromDataSession);
       setPdfStatus("ready");
       return;
     }
     setPdfHref(null);
     setPdfStatus("loading");
-  }, [id]);
+  }, [id, state?.pdfBlobUrl]);
 
   useEffect(() => {
     if (!id) return undefined;
+    if (state?.pdfBlobUrl && String(state.pdfBlobUrl).startsWith("blob:")) return undefined;
+    if (peekPdfBlobUrlFromSession(id)) return undefined;
     if (peekPdfDataUrlFromSession(id)) return undefined;
 
     let cancelled = false;
-    let objectUrl = null;
     (async () => {
       const blob = await getLocalPdfBlob(id).catch(() => null);
       if (cancelled) return;
       if (blob && blob.size > 0) {
-        objectUrl = URL.createObjectURL(blob);
+        const objectUrl = URL.createObjectURL(blob);
         if (cancelled) {
           URL.revokeObjectURL(objectUrl);
           return;
         }
+        idbObjectUrlRef.current = objectUrl;
         setPdfHref(objectUrl);
         setPdfStatus("ready");
       } else {
@@ -58,9 +74,12 @@ export default function Done() {
 
     return () => {
       cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (idbObjectUrlRef.current) {
+        URL.revokeObjectURL(idbObjectUrlRef.current);
+        idbObjectUrlRef.current = null;
+      }
     };
-  }, [id]);
+  }, [id, state?.pdfBlobUrl]);
 
   useEffect(() => {
     let cancelled = false;
