@@ -21,23 +21,6 @@ import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
 import styles from "./EditPages.module.css";
 
-function StudioDockIconPhoto() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden>
-      <rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.75" />
-      <path
-        d="M3 17l5.5-5.5a1.5 1.5 0 012.12 0L16 17"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.75"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="8.5" cy="9.5" r="1.5" fill="none" stroke="currentColor" strokeWidth="1.75" />
-    </svg>
-  );
-}
-
 function StudioDockIconLayout() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden>
@@ -4203,21 +4186,6 @@ export default function EditPages() {
       {viewIndex > 0 && (
         <div className={styles.studioBottomDock}>
           <div className={styles.studioDockScroll} ref={dockScrollRef}>
-            <button
-              type="button"
-              className={styles.studioDockItem}
-              disabled={studioUploading}
-              onClick={() => {
-                const pid = activePageId || leftPage?.id;
-                if (pid) openStudioPhotoPicker(pid);
-                else setError("בחרו עמוד.");
-              }}
-            >
-              <span className={styles.studioDockIcon}>
-                <StudioDockIconPhoto />
-              </span>
-              <span className={styles.studioDockLabel}>תמונות</span>
-            </button>
             <button type="button" className={styles.studioDockItem} onClick={() => setShowLayoutSheet(true)}>
               <span className={styles.studioDockIcon}>
                 <StudioDockIconLayout />
