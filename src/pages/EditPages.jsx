@@ -358,6 +358,21 @@ function StudioTemplatePreviewThumb({ slots }) {
   );
 }
 
+/** True when a photo's saved layout matches this template slot's frame (not "nth photo = nth slot"). */
+function studioLayoutMatchesSlot(layout, slot, tol = 0.85) {
+  if (!layout || typeof layout.x !== "number" || typeof layout.y !== "number") return false;
+  if (!slot || typeof slot.x !== "number" || typeof slot.y !== "number") return false;
+  for (const k of ["x", "y", "w", "h"]) {
+    const lv = layout[k];
+    const sv = slot[k];
+    if (typeof lv !== "number" || typeof sv !== "number") return false;
+    if (Math.abs(lv - sv) > tol) return false;
+  }
+  const lr = Number.isFinite(layout.rotation) ? layout.rotation : 0;
+  const sr = Number.isFinite(slot.rotation) ? slot.rotation : 0;
+  return Math.abs(lr - sr) <= tol;
+}
+
 /** On-page template: tappable + for each empty slot (under photos; see .studioSpreadFrame .pagePhotosAbsolute z-index). */
 function StudioTemplateSlotsLayer({ page, onSlotTap }) {
   const slots = page?.page_config?.studioTemplate?.slots;
@@ -366,8 +381,8 @@ function StudioTemplateSlotsLayer({ page, onSlotTap }) {
   return (
     <div className={styles.studioTemplateSlotsLayer}>
       {slots.map((slot, i) => {
-        const filled = i < photos.length;
-        if (filled) return null;
+        const hasPhotoInSlot = photos.some((p) => studioLayoutMatchesSlot(p.layout, slot));
+        if (hasPhotoInSlot) return null;
         return (
           <button
             key={i}
