@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
-import { useParams, useLocation, Link } from "react-router-dom";
-import { getAlbum, updateAlbum, getPdfDownloadUrl } from "../api";
+import { useState, useEffect, useLayoutEffect } from "react";
+import { useParams, Link } from "react-router-dom";
+import { getAlbum, updateAlbum } from "../api";
 import { getLocalPdfBlob } from "../pdfLocalCache";
+import { peekPdfDataUrlFromSession } from "../pdfSessionBridge";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import styles from "./Done.module.css";
@@ -14,35 +15,50 @@ function ensureShareToken(album) {
 
 export default function Done() {
   const { id } = useParams();
-  const { state } = useLocation();
   const [album, setAlbum] = useState(null);
   const [shareUrl, setShareUrl] = useState("");
-  const [localPdfObjectUrl, setLocalPdfObjectUrl] = useState(null);
+  /** data: URL from session (immediate) or blob: from IndexedDB */
+  const [pdfHref, setPdfHref] = useState(null);
+  /** loading | ready | missing */
+  const [pdfStatus, setPdfStatus] = useState("loading");
 
-  const serverPdfUrl = id ? getPdfDownloadUrl(id) : "";
-  const pdfUrl =
-    localPdfObjectUrl ||
-    (state?.pdfUrl && id ? state.pdfUrl : "") ||
-    serverPdfUrl;
+  useLayoutEffect(() => {
+    if (!id) return;
+    const fromSession = peekPdfDataUrlFromSession(id);
+    if (fromSession) {
+      setPdfHref(fromSession);
+      setPdfStatus("ready");
+      return;
+    }
+    setPdfHref(null);
+    setPdfStatus("loading");
+  }, [id]);
 
   useEffect(() => {
     if (!id) return undefined;
+    if (peekPdfDataUrlFromSession(id)) return undefined;
+
     let cancelled = false;
     let objectUrl = null;
     (async () => {
       const blob = await getLocalPdfBlob(id).catch(() => null);
-      if (cancelled || !blob) return;
-      objectUrl = URL.createObjectURL(blob);
-      if (cancelled) {
-        URL.revokeObjectURL(objectUrl);
-        return;
+      if (cancelled) return;
+      if (blob && blob.size > 0) {
+        objectUrl = URL.createObjectURL(blob);
+        if (cancelled) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        setPdfHref(objectUrl);
+        setPdfStatus("ready");
+      } else {
+        setPdfStatus("missing");
       }
-      setLocalPdfObjectUrl(objectUrl);
     })();
+
     return () => {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
-      setLocalPdfObjectUrl(null);
     };
   }, [id]);
 
@@ -69,7 +85,9 @@ export default function Done() {
         }
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   useEffect(() => {
@@ -86,9 +104,26 @@ export default function Done() {
         <div className={styles.icon}>✓</div>
         <h1>האלבום מוכן!</h1>
         <p className={styles.sub}>הורד את האלבום כקובץ PDF לשמירה או הדפסה.</p>
-        <a href={pdfUrl} download="album.pdf" className={styles.cta}>
-          הורד PDF
-        </a>
+
+        {pdfStatus === "loading" && <p className={styles.sub}>טוען את הקובץ…</p>}
+
+        {pdfStatus === "ready" && pdfHref && (
+          <a href={pdfHref} download="album.pdf" className={styles.cta}>
+            הורד PDF
+          </a>
+        )}
+
+        {pdfStatus === "missing" && (
+          <div className={styles.sub} style={{ textAlign: "center", maxWidth: "22rem", margin: "0 auto 1rem" }}>
+            <p style={{ marginBottom: "0.75rem" }}>
+              הקובץ נוצר במכשיר זה ולא נשמר אחרי סגירת הדפדפן. לחצו שוב על &quot;סיום והורדת PDF&quot; מהסטודיו כדי ליצור עותק עם עברית תקינה.
+            </p>
+            <Link to={`/album/${id}/pages`} className={styles.cta}>
+              חזרה לסטודיו
+            </Link>
+          </div>
+        )}
+
         {shareUrl && (
           <div className={styles.shareSection}>
             <p className={styles.shareLabel}>קישור לשיתוף – כל מי שישלחו לו את הקישור יוכל לצפות באלבום:</p>

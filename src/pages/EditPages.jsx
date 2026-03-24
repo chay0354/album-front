@@ -8,7 +8,6 @@ import {
   uploadPhotos,
   getPhotoUrl,
   getCoverUrl,
-  getPdfDownloadUrl,
   movePhotoToPage,
   removePhoto,
   updatePhotoLayout,
@@ -21,6 +20,7 @@ import { toJpeg } from "html-to-image";
 import { domToJpeg } from "modern-screenshot";
 import { buildPdfBlobFromJpegDataUrls } from "../pdfClient";
 import { saveLocalPdfBlob } from "../pdfLocalCache";
+import { stashPdfDataUrlForSession } from "../pdfSessionBridge";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
@@ -3456,7 +3456,8 @@ export default function EditPages() {
       }
 
       const blob = buildPdfBlobFromJpegDataUrls(images);
-      await saveLocalPdfBlob(id, blob);
+      await saveLocalPdfBlob(id, blob).catch(() => {});
+      await stashPdfDataUrlForSession(id, blob);
       const objUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = objUrl;
