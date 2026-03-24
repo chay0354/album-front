@@ -142,6 +142,17 @@ export async function addPage(albumId) {
   return r.json();
 }
 
+/** Set album to exactly `targetCount` pages in one request (fast vs looping addPage/deletePage). */
+export async function syncAlbumPageCount(albumId, targetCount) {
+  const r = await fetch(`${API}/albums/${albumId}/pages/sync`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_count: targetCount }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
 export async function deletePage(albumId, pageId) {
   const r = await fetch(`${API}/albums/${albumId}/pages/${pageId}`, { method: "DELETE" });
   if (!r.ok) throw new Error(await r.text());

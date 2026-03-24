@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getAlbum, addPage, deletePage } from "../api";
+import { getAlbum, syncAlbumPageCount } from "../api";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import styles from "./PagesCount.module.css";
@@ -36,22 +36,7 @@ export default function PagesCount() {
     setApplying(true);
     setError(null);
     try {
-      let a = await getAlbum(id);
-      let pages = a.pages || [];
-      while (pages.length < effectiveTarget) {
-        await addPage(id);
-        a = await getAlbum(id);
-        pages = a.pages || [];
-      }
-      while (pages.length > effectiveTarget) {
-        const sorted = [...pages].sort((x, y) => (x.page_order ?? 0) - (y.page_order ?? 0));
-        const last = sorted[sorted.length - 1];
-        if (last?.id) {
-          await deletePage(id, last.id);
-          a = await getAlbum(id);
-          pages = a.pages || [];
-        } else break;
-      }
+      await syncAlbumPageCount(id, effectiveTarget);
       navigate(`/album/${id}/pages`);
     } catch (e) {
       setError(e?.message || "שגיאה");

@@ -10,8 +10,12 @@ export const FONT_OPTIONS = [
 
 export const DEFAULT_FONT = FONT_OPTIONS[0].value;
 
-/** Returns a CSS font-family value (quoted when name has spaces so all 6 fonts apply correctly). */
+/** Emoji fallback so emoji display on iPhone and other devices (system emoji fonts). */
+const EMOJI_FONT_FALLBACK = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+
+/** Returns a CSS font-family value with emoji fallback so Hebrew + emoji both display. */
 export function getFontStack(fontName) {
-  if (!fontName) return "Heebo, sans-serif";
-  return fontName.includes(" ") ? `"${fontName}", sans-serif` : `${fontName}, sans-serif`;
+  if (!fontName) return `Heebo, ${EMOJI_FONT_FALLBACK}`;
+  const main = fontName.includes(" ") ? `"${fontName}"` : fontName;
+  return `${main}, ${EMOJI_FONT_FALLBACK}`;
 }
