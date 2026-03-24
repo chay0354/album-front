@@ -59,4 +59,10 @@
   .step .label {
     display: none;
   }
+  .currentLabel {
+    font-size: 0.82rem;
+    margin-top: 0.35rem;
+    padding: 0 0.35rem;
+    line-height: 1.3;
+  }
 }

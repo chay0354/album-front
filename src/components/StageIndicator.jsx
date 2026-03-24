@@ -8,9 +8,9 @@ const STAGES = [
   { num: 5, label: "סיום" },
 ];
 
-export default function StageIndicator({ current }) {
+export default function StageIndicator({ current, className = "" }) {
   return (
-    <div className={styles.wrap} role="navigation" aria-label="שלבי יצירת האלבום">
+    <div className={[styles.wrap, className].filter(Boolean).join(" ")} role="navigation" aria-label="שלבי יצירת האלבום">
       <div className={styles.bar}>
         {STAGES.map((s) => (
           <div

@@ -39,17 +39,14 @@ function normalizePhotoLayoutFromAlbumPhoto(photo, indexInPage) {
   return { ...base, ...photo.layout, rotation: photo.layout.rotation ?? 0 };
 }
 
-function renderSpreadPhotoInner(layout, imgSrc, onNaturalAspect) {
+function renderSpreadPhotoInner(layout, imgSrc, onNaturalSize) {
   const crop = getPhotoLayoutCrop(layout) || DEFAULT_PHOTO_CROP;
   const hasCrop = crop.l > 0 || crop.t > 0 || crop.w < 100 || crop.h < 100;
-  const onLoad = onNaturalAspect
+  const onLoad = onNaturalSize
     ? (e) => {
         const im = e.currentTarget;
         if (im.naturalWidth > 0 && im.naturalHeight > 0) {
-          const base = im.naturalWidth / im.naturalHeight;
-          const r =
-            hasCrop && crop.w > 0 && crop.h > 0 ? base * (crop.w / crop.h) : base;
-          onNaturalAspect(r);
+          onNaturalSize({ width: im.naturalWidth, height: im.naturalHeight });
         }
       }
     : undefined;
@@ -80,6 +77,35 @@ function layoutAspectRatioFromImage(imageAspectWH, containerRect) {
   return (imageAspectWH * ch) / cw;
 }
 
+/** Pixel aspect (width/height) of visible image from file pixels + current crop rect */
+function visibleImageAspectRatioFromLayout(layout, naturalWH) {
+  if (!naturalWH || naturalWH.width <= 0 || naturalWH.height <= 0) return null;
+  const crop = getPhotoLayoutCrop(layout) || DEFAULT_PHOTO_CROP;
+  const hasCrop = crop.l > 0 || crop.t > 0 || crop.w < 100 || crop.h < 100;
+  const base = naturalWH.width / naturalWH.height;
+  if (hasCrop && crop.w > 0 && crop.h > 0) return base * (crop.w / crop.h);
+  return base;
+}
+
+/** Clamp w,h to bounds while keeping w/h === k (fixes drift from alternating w/h clamps) */
+function fitBoxToAspectBounds(w, h, k, minS, maxW, maxH) {
+  const kk = Math.max(k, 1e-9);
+  for (let i = 0; i < 20; i++) {
+    w = Math.max(minS, Math.min(maxW, w));
+    h = w / kk;
+    if (h > maxH) {
+      h = maxH;
+      w = kk * h;
+    } else if (h < minS) {
+      h = minS;
+      w = kk * h;
+    } else {
+      break;
+    }
+  }
+  return { w, h };
+}
+
 function clampAspectBoxFromPointer(rw, rh, k, minS, maxW, maxH) {
   const eps = 1e-9;
   const kk = Math.max(k, eps);
@@ -97,31 +123,7 @@ function clampAspectBoxFromPointer(rw, rh, k, minS, maxW, maxH) {
     h = rh;
     w = kk * rh;
   }
-  for (let i = 0; i < 12; i++) {
-    let changed = false;
-    if (w < minS) {
-      w = minS;
-      h = w / kk;
-      changed = true;
-    }
-    if (h < minS) {
-      h = minS;
-      w = kk * h;
-      changed = true;
-    }
-    if (w > maxW) {
-      w = maxW;
-      h = w / kk;
-      changed = true;
-    }
-    if (h > maxH) {
-      h = maxH;
-      w = kk * h;
-      changed = true;
-    }
-    if (!changed) break;
-  }
-  return { w, h };
+  return fitBoxToAspectBounds(w, h, kk, minS, maxW, maxH);
 }
 
 function resizeLayoutKeepImageAspect(handle, startLayout, pctX, pctY, k, minS, maxXY) {
@@ -506,17 +508,14 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
   const TEXT_DRAG_THRESHOLD_TOUCH_PX = 14;
   const DEFAULT_CROP = { l: 0, t: 0, w: 100, h: 100 };
   const getCrop = (layout) => layout?.crop && typeof layout.crop.w === "number" ? layout.crop : null;
-  const applyCrop = (layout, imgSrc, onNaturalAspect) => {
+  const applyCrop = (layout, imgSrc, onNaturalSize) => {
     const crop = getCrop(layout) || DEFAULT_CROP;
     const hasCrop = crop.l > 0 || crop.t > 0 || crop.w < 100 || crop.h < 100;
-    const onLoad = onNaturalAspect
+    const onLoad = onNaturalSize
       ? (e) => {
           const im = e.currentTarget;
           if (im.naturalWidth > 0 && im.naturalHeight > 0) {
-            const base = im.naturalWidth / im.naturalHeight;
-            const r =
-              hasCrop && crop.w > 0 && crop.h > 0 ? base * (crop.w / crop.h) : base;
-            onNaturalAspect(r);
+            onNaturalSize({ width: im.naturalWidth, height: im.naturalHeight });
           }
         }
       : undefined;
@@ -953,7 +952,8 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
     }
     const rect = el.getBoundingClientRect();
     const l0 = { ...layout };
-    const R = photoNaturalAspectRef.current[photoId];
+    const nat = photoNaturalAspectRef.current[photoId];
+    const R = visibleImageAspectRatioFromLayout(l0, nat);
     const aspectK =
       R != null && R > 0 && Number.isFinite(R) ? layoutAspectRatioFromImage(R, rect) : l0.w / Math.max(l0.h, 1e-6);
     resizeRef.current = { photoId, handle, startLayout: l0, aspectK };
@@ -1339,8 +1339,8 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                             onTouchStart={(e) => !resizingId && handleMouseDown(e, p.id)}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {applyCrop(layouts[p.id] || slotLayout, getPhotoUrl(p.storage_path), (ar) => {
-                              photoNaturalAspectRef.current[p.id] = ar;
+                            {applyCrop(layouts[p.id] || slotLayout, getPhotoUrl(p.storage_path), (wh) => {
+                              photoNaturalAspectRef.current[p.id] = wh;
                             })}
                           </div>
                           {selectedId === photoId && selectedLayout && (
@@ -1440,8 +1440,8 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
                         onTouchStart={(e) => !resizingId && handleMouseDown(e, p.id)}
                     onClick={(e) => e.stopPropagation()}
                   >
-                        {applyCrop(layouts[p.id] || DEFAULT_LAYOUT(0), getPhotoUrl(p.storage_path), (ar) => {
-                          photoNaturalAspectRef.current[p.id] = ar;
+                        {applyCrop(layouts[p.id] || DEFAULT_LAYOUT(0), getPhotoUrl(p.storage_path), (wh) => {
+                          photoNaturalAspectRef.current[p.id] = wh;
                         })}
                       </div>
                       {selectedId === p.id && selectedLayout && (
@@ -2245,7 +2245,8 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
       }
       const rect = el.getBoundingClientRect();
       const l0 = { ...layout };
-      const R = naturalAspectByPhotoRef.current[photoId];
+      const nat = naturalAspectByPhotoRef.current[photoId];
+      const R = visibleImageAspectRatioFromLayout(l0, nat);
       const aspectK =
         R != null && R > 0 && Number.isFinite(R)
           ? layoutAspectRatioFromImage(R, rect)
@@ -2497,8 +2498,8 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
               onTouchStart={(e) => !resizingId && handlePhotoPointerDown(e, p.id)}
               onClick={(e) => e.stopPropagation()}
             >
-              {renderSpreadPhotoInner(layout, getPhotoUrl(p.storage_path), (ar) => {
-                naturalAspectByPhotoRef.current[p.id] = ar;
+              {renderSpreadPhotoInner(layout, getPhotoUrl(p.storage_path), (wh) => {
+                naturalAspectByPhotoRef.current[p.id] = wh;
               })}
             </div>
             {isSelected && (
@@ -3375,7 +3376,7 @@ export default function EditPages() {
         }}
       />
 
-      <StageIndicator current={3} />
+      <StageIndicator current={3} className={styles.studioStageIndicator} />
 
       <div className={styles.studioTopBar}>
         <button

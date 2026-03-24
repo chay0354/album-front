@@ -2912,3 +2912,197 @@
   text-align: center;
   color: #6b7280;
 }
+
+/* Step 3 studio — mobile (עריכת עמודים) */
+@media (max-width: 768px) {
+  .studioStageIndicator {
+    margin-bottom: 0.5rem;
+  }
+
+  .studioRoot {
+    padding-top: max(0.35rem, env(safe-area-inset-top));
+    padding-left: max(0.35rem, env(safe-area-inset-left));
+    padding-right: max(0.35rem, env(safe-area-inset-right));
+    padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
+    max-width: 100%;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .studioTopBar {
+    gap: 0.3rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .studioTopBtn {
+    width: 44px;
+    height: 44px;
+    font-size: 0.52rem;
+  }
+
+  .studioTopBtnIcon {
+    font-size: 1rem;
+  }
+
+  .studioTopBtnNext {
+    min-width: 4.25rem;
+    max-width: 5.25rem;
+    padding: 0 0.3rem;
+    font-size: 0.5rem;
+  }
+
+  .studioTopBtnNextSub {
+    font-size: 0.46rem;
+  }
+
+  .studioSpreadWrap {
+    padding: 0.45rem;
+    border-radius: 12px;
+    margin-bottom: 0.3rem;
+  }
+
+  .studioPageNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    justify-content: space-between;
+    row-gap: 0.45rem;
+    column-gap: 0.35rem;
+    margin-bottom: 0.45rem;
+  }
+
+  /* Full-width row: page picker; next row: prev + next share one line (same height) */
+  .studioPageSelectWrap {
+    flex: 1 0 100%;
+    order: -1;
+    min-width: 0;
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  .studioNavLink {
+    font-size: 0.74rem;
+    padding: 0.45rem 0.35rem;
+    min-height: 44px;
+    flex: 1 1 0;
+    min-width: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .studioPageSelect {
+    font-size: 0.78rem;
+    padding: 0.45rem 1.5rem 0.45rem 0.5rem;
+    min-height: 44px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .studioActivePageHint {
+    font-size: 0.64rem;
+    padding: 0 0.2rem;
+    line-height: 1.4;
+    margin-bottom: 0.2rem;
+  }
+
+  /* Global mobile rule stacks .spread; keep studio spread side-by-side */
+  .studioSpreadFrame .spread {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    justify-content: center;
+    gap: 0;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .studioSpreadFrame .halfPageWrapper {
+    max-width: none;
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+  }
+
+  .studioSpreadFrame .halfPage {
+    max-width: none;
+    width: 100%;
+  }
+
+  .studioSpreadFrame .studioSpine {
+    width: 8px;
+    flex-shrink: 0;
+    align-self: stretch;
+    min-height: 120px;
+  }
+
+  .studioSpreadFrame .albumView {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .studioTextToolbar {
+    padding: 0.5rem 0.5rem;
+    gap: 0.4rem;
+  }
+
+  .studioTextToolbarSlider {
+    flex: 1 1 100px;
+    min-width: 72px;
+    width: auto;
+    max-width: 100%;
+  }
+
+  .studioTextToolbarSizeWrap {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .studioPhotoSelectionBar {
+    padding: 0.4rem 0.45rem;
+    gap: 0.4rem;
+  }
+
+  .studioPhotoSelectionBarBtn {
+    min-height: 44px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.76rem;
+  }
+
+  .studioBottomDock {
+    max-width: 100%;
+    left: 0;
+    right: 0;
+    padding-left: max(0.3rem, env(safe-area-inset-left));
+    padding-right: max(0.3rem, env(safe-area-inset-right));
+  }
+
+  .studioDockItem {
+    min-width: 58px;
+    min-height: 48px;
+  }
+
+  .studioSheet {
+    max-height: min(88vh, 88dvh);
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    padding-top: max(0.85rem, env(safe-area-inset-top));
+  }
+
+  .studioCoverCard {
+    padding: 0.65rem;
+    border-radius: 12px;
+  }
+
+  .studioAllPagesGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 380px) {
+  .studioNavLink {
+    font-size: 0.68rem;
+    padding: 0.4rem 0.25rem;
+  }
+}
