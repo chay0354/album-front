@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useLocation, Link } from "react-router-dom";
 import { getAlbum, updateAlbum, getPdfDownloadUrl } from "../api";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
@@ -13,9 +13,10 @@ function ensureShareToken(album) {
 
 export default function Done() {
   const { id } = useParams();
+  const { state } = useLocation();
   const [album, setAlbum] = useState(null);
   const [shareUrl, setShareUrl] = useState("");
-  const pdfUrl = id ? getPdfDownloadUrl(id) : "";
+  const pdfUrl = (state?.pdfUrl && id) ? state.pdfUrl : (id ? getPdfDownloadUrl(id) : "");
 
   useEffect(() => {
     let cancelled = false;

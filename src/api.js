@@ -255,6 +255,19 @@ export function getPdfDownloadUrl(albumId) {
   return `${API_BASE || ""}/api/pdf/generate/${albumId}`;
 }
 
+/** Generate PDF from client-rendered page images (fixes Hebrew on iPhone). Returns { blob, pdfUrl }. */
+export async function generatePdfFromImages(albumId, imageDataUrls) {
+  const r = await fetch(`${API}/pdf/generate-from-images`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ albumId, images: imageDataUrls }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  const blob = await r.blob();
+  const pdfUrl = r.headers.get("X-Pdf-Url") || null;
+  return { blob, pdfUrl };
+}
+
 export async function getPdfDeliveries() {
   const r = await fetch(`${API}/admin/pdf-deliveries`);
   if (!r.ok) throw new Error(await r.text());
