@@ -21,6 +21,7 @@ import { domToJpeg } from "modern-screenshot";
 import { buildPdfBlobFromJpegDataUrls } from "../pdfClient";
 import { saveLocalPdfBlob } from "../pdfLocalCache";
 import { stashPdfDataUrlForSession, stashPdfBlobUrlForSession } from "../pdfSessionBridge";
+import { stashPdfHandoff } from "../pdfHandoff";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
@@ -3459,6 +3460,7 @@ export default function EditPages() {
       await saveLocalPdfBlob(id, blob).catch(() => {});
       await stashPdfDataUrlForSession(id, blob);
       const pdfBlobUrl = URL.createObjectURL(blob);
+      stashPdfHandoff(id, pdfBlobUrl);
       stashPdfBlobUrlForSession(id, pdfBlobUrl);
       const a = document.createElement("a");
       a.href = pdfBlobUrl;

@@ -3,6 +3,7 @@ import { useParams, useLocation, Link } from "react-router-dom";
 import { getAlbum, updateAlbum } from "../api";
 import { getLocalPdfBlob } from "../pdfLocalCache";
 import { peekPdfDataUrlFromSession, peekPdfBlobUrlFromSession } from "../pdfSessionBridge";
+import { peekPdfHandoff } from "../pdfHandoff";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import styles from "./Done.module.css";
@@ -26,6 +27,12 @@ export default function Done() {
 
   useLayoutEffect(() => {
     if (!id) return;
+    const fromMemory = peekPdfHandoff(id);
+    if (fromMemory && fromMemory.startsWith("blob:")) {
+      setPdfHref(fromMemory);
+      setPdfStatus("ready");
+      return;
+    }
     const fromNav = state?.pdfBlobUrl;
     if (fromNav && typeof fromNav === "string" && fromNav.startsWith("blob:")) {
       setPdfHref(fromNav);
@@ -50,6 +57,7 @@ export default function Done() {
 
   useEffect(() => {
     if (!id) return undefined;
+    if (peekPdfHandoff(id)) return undefined;
     if (state?.pdfBlobUrl && String(state.pdfBlobUrl).startsWith("blob:")) return undefined;
     if (peekPdfBlobUrlFromSession(id)) return undefined;
     if (peekPdfDataUrlFromSession(id)) return undefined;
@@ -68,6 +76,8 @@ export default function Done() {
         setPdfHref(objectUrl);
         setPdfStatus("ready");
       } else {
+        if (cancelled) return;
+        if (peekPdfHandoff(id) || peekPdfBlobUrlFromSession(id) || peekPdfDataUrlFromSession(id)) return;
         setPdfStatus("missing");
       }
     })();
