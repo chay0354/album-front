@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { flushSync } from "react-dom";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   getAlbum,
   getBaseCovers,
@@ -425,8 +425,9 @@ function setMinimalDragImage(e) {
   setTimeout(() => el.remove(), 0);
 }
 
-const PDF_OUT_W = 595;
-const PDF_OUT_H = 842;
+/** Raster page size before embedding in A4 PDF (~2× jsPDF pt for sharper output). */
+const PDF_OUT_W = 1190;
+const PDF_OUT_H = 1684;
 
 /** Raster snapshot of the visible page (pixels only — no PDF font encoding). Order: modern-screenshot → html-to-image → html2canvas. */
 async function captureVisibleElementToPdfJpeg(el) {
@@ -436,12 +437,12 @@ async function captureVisibleElementToPdfJpeg(el) {
   await new Promise((r) => requestAnimationFrame(r));
   await new Promise((r) => requestAnimationFrame(r));
 
-  const pr = Math.min(3, Math.max(2, Math.ceil(960 / Math.max(1, el.offsetWidth))));
+  const pr = Math.min(4, Math.max(2, Math.ceil(1800 / Math.max(1, el.offsetWidth))));
 
   let dataUrl;
   try {
     dataUrl = await domToJpeg(el, {
-      quality: 0.92,
+      quality: 0.95,
       scale: pr,
       backgroundColor: "#ffffff",
       fetch: { bypassingCache: true },
@@ -452,7 +453,7 @@ async function captureVisibleElementToPdfJpeg(el) {
     console.warn("[PDF] domToJpeg failed:", e1?.message || e1);
     try {
       dataUrl = await toJpeg(el, {
-        quality: 0.9,
+        quality: 0.93,
         pixelRatio: pr,
         cacheBust: true,
         backgroundColor: "#ffffff",
@@ -470,7 +471,7 @@ async function captureVisibleElementToPdfJpeg(el) {
         scrollX: 0,
         scrollY: -window.scrollY,
       });
-      dataUrl = canvas.toDataURL("image/jpeg", 0.9);
+      dataUrl = canvas.toDataURL("image/jpeg", 0.93);
     }
   }
 
@@ -497,7 +498,7 @@ async function captureVisibleElementToPdfJpeg(el) {
   const dx = (PDF_OUT_W - dw) / 2;
   const dy = (PDF_OUT_H - dh) / 2;
   ctx.drawImage(img, 0, 0, nw, nh, dx, dy, dw, dh);
-  return out.toDataURL("image/jpeg", 0.88);
+  return out.toDataURL("image/jpeg", 0.93);
 }
 
 function AlbumCover({ album, coverUrl }) {
@@ -3352,6 +3353,9 @@ function AlbumSpread({
 export default function EditPages() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const autoPdfNavKeyRef = useRef(null);
+  const finishPdfRef = useRef(null);
   const [album, setAlbum] = useState(null);
   const [viewIndex, setViewIndex] = useState(1);
   const [coverImageUrl, setCoverImageUrl] = useState(null);
@@ -3373,7 +3377,6 @@ export default function EditPages() {
   const [studioElementsList, setStudioElementsList] = useState([]);
   const [showQrSheet, setShowQrSheet] = useState(false);
   const [showAllPagesSheet, setShowAllPagesSheet] = useState(false);
-  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [shareUrlQr, setShareUrlQr] = useState("");
   const [studioUploading, setStudioUploading] = useState(false);
   const [undoDepth, setUndoDepth] = useState(0);
@@ -3394,13 +3397,16 @@ export default function EditPages() {
   }, [id]);
 
   useEffect(() => {
+    autoPdfNavKeyRef.current = null;
+  }, [id]);
+
+  useEffect(() => {
     getElementsList().then(setStudioElementsList).catch(() => setStudioElementsList([]));
   }, []);
 
   async function handleFinishAndDownload() {
     setGeneratingPdf(true);
     setError(null);
-    setShowMoreMenu(false);
 
     const pagesSorted = [...(album?.pages || [])].sort((a, b) => (a.page_order ?? 0) - (b.page_order ?? 0));
     const captureSteps = [{ kind: "cover" }];
@@ -3483,6 +3489,20 @@ export default function EditPages() {
       setGeneratingPdf(false);
     }
   }
+
+  finishPdfRef.current = handleFinishAndDownload;
+
+  useEffect(() => {
+    const wantAutoPdf = location.state?.autoGeneratePdf || location.state?.openPdfFinish;
+    if (!wantAutoPdf) return;
+    if (!album || generatingPdf) return;
+    if (autoPdfNavKeyRef.current === location.key) return;
+    autoPdfNavKeyRef.current = location.key;
+    navigate(".", { replace: true, state: {} });
+    queueMicrotask(() => {
+      finishPdfRef.current?.();
+    });
+  }, [album, location.state?.autoGeneratePdf, location.state?.openPdfFinish, location.key, generatingPdf, navigate]);
 
   useEffect(() => {
     if (!album?.cover_id) {
@@ -3887,7 +3907,6 @@ export default function EditPages() {
   }
 
   function openShareQrSheet() {
-    setShowMoreMenu(false);
     if (!album || !id) return;
     // Same album through the editor flow (not /view which is read-only / copy).
     setShareUrlQr(`${window.location.origin}/album/${id}/cover`);
@@ -4106,7 +4125,6 @@ export default function EditPages() {
           type="button"
           className={`${styles.studioTopBtn} ${styles.studioTopBtnNext}`}
           onClick={() => {
-            setShowMoreMenu(false);
             navigate(`/album/${id}/preview`);
           }}
           title="שלב 4: צפייה באלבום"
@@ -4139,7 +4157,7 @@ export default function EditPages() {
         <button
           type="button"
           className={styles.studioTopBtn}
-          onClick={() => { setShowAllPagesSheet(true); setShowMoreMenu(false); }}
+          onClick={() => setShowAllPagesSheet(true)}
           title="כל העמודים"
         >
           <span className={styles.studioTopBtnIcon} aria-hidden>▤</span>
@@ -4148,55 +4166,29 @@ export default function EditPages() {
         <button
           type="button"
           className={styles.studioTopBtn}
-          onClick={() => setShowMoreMenu((v) => !v)}
-          title="עוד"
+          onClick={() => {
+            const p = activePageForTools;
+            if (p) setEditingPage(p);
+            else setError("בחרו עמוד בשיפוע (הקישו על עמוד).");
+          }}
+          title="עריכה מתקדמת (הזזה, חיתוך, מדבקות)"
+          aria-label="עריכה מתקדמת"
         >
-          <span className={styles.studioTopBtnIcon} aria-hidden>⋯</span>
-          עוד
-          </button>
-        </div>
-
-      {showMoreMenu && (
-        <div
-          className={styles.studioSheetBackdrop}
-          style={{ alignItems: "flex-start", paddingTop: "4.5rem" }}
-          onClick={() => setShowMoreMenu(false)}
-          role="presentation"
+          <span className={styles.studioTopBtnIcon} aria-hidden>✎</span>
+          עריכת עמוד
+        </button>
+        <button
+          type="button"
+          className={styles.studioTopBtn}
+          onClick={() => void handleFinishAndDownload()}
+          disabled={generatingPdf}
+          title="סיום והורדת PDF"
+          aria-label="סיום והורדת PDF"
         >
-          <div className={styles.studioSheet} style={{ maxHeight: "50vh" }} onClick={(e) => e.stopPropagation()}>
-            <ul className={styles.studioMoreList}>
-              <li>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowMoreMenu(false);
-                    const p = activePageForTools;
-                    if (p) setEditingPage(p);
-                    else setError("בחרו עמוד בשיפוע (הקישו על עמוד).");
-                  }}
-                >
-                  עריכה מתקדמת (הזזה, חיתוך, מדבקות)
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => { setShowMoreMenu(false); navigate(`/album/${id}/preview`); }}>
-                  צפייה באלבום
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => { setShowMoreMenu(false); navigate(`/album/${id}/pages-count`); }}>
-                  חזרה למספר עמודים
-                </button>
-              </li>
-              <li>
-                <button type="button" onClick={() => { setShowMoreMenu(false); handleFinishAndDownload(); }} disabled={generatingPdf}>
-                  {generatingPdf ? "מכין…" : "סיום והורדת PDF"}
-                </button>
-              </li>
-            </ul>
-          </div>
+          <span className={styles.studioTopBtnIcon} aria-hidden>↓</span>
+          <span>{generatingPdf ? "מכין…" : "סיום והורדת PDF"}</span>
+        </button>
         </div>
-      )}
 
       {viewIndex > 0 && (
         <p className={styles.studioActivePageHint}>

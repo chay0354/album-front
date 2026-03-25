@@ -13,7 +13,7 @@ export function buildPdfBlobFromJpegDataUrls(jpegDataUrls) {
   const h = pdf.internal.pageSize.getHeight();
   jpegDataUrls.forEach((dataUrl, i) => {
     if (i > 0) pdf.addPage();
-    pdf.addImage(dataUrl, "JPEG", 0, 0, w, h, undefined, "FAST");
+    pdf.addImage(dataUrl, "JPEG", 0, 0, w, h, undefined, "MEDIUM");
   });
   return pdf.output("blob");
 }

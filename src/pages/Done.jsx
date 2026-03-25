@@ -145,10 +145,10 @@ export default function Done() {
         {pdfStatus === "missing" && (
           <div className={styles.sub} style={{ textAlign: "center", maxWidth: "22rem", margin: "0 auto 1rem" }}>
             <p style={{ marginBottom: "0.75rem" }}>
-              הקובץ נוצר במכשיר זה ולא נשמר אחרי סגירת הדפדפן. לחצו שוב על &quot;סיום והורדת PDF&quot; מהסטודיו כדי ליצור עותק עם עברית תקינה.
+              לא נמצא PDF במכשיר. לחצו למטה — ייפתח הסטודיו, יווצר ה־PDF אוטומטית ותועברו חזרה להורדה. (לחלופין: בתפריט (⋮) בחרו &quot;סיום והורדת PDF&quot;.)
             </p>
-            <Link to={`/album/${id}/pages`} className={styles.cta}>
-              חזרה לסטודיו
+            <Link to={`/album/${id}/pages`} state={{ autoGeneratePdf: true }} className={styles.cta}>
+              צור והורד PDF
             </Link>
           </div>
         )}

@@ -3331,7 +3331,34 @@
   pointer-events: none !important;
 }
 
+/* Strip selection / edit chrome so it is not baked into the PDF raster */
 :global(body.pdfCaptureMode) .halfPageActive {
-  box-shadow: var(--shadow), var(--shadow-strong) !important;
-  border-color: var(--surface3) !important;
+  outline: none !important;
+  outline-offset: 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  z-index: auto !important;
+}
+
+:global(body.pdfCaptureMode) .editorPhotoSelected {
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+:global(body.pdfCaptureMode) .pageTextDisplay.pageTextSelectedStudio .pageTextTitle {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+:global(body.pdfCaptureMode) .pageTextInlineInputSpread {
+  outline: none !important;
+}
+
+:global(body.pdfCaptureMode) .editorResizeHandle {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+:global(body.pdfCaptureMode) .coverSingle {
+  box-shadow: none !important;
 }

@@ -515,8 +515,12 @@ export default function Preview() {
         <button type="button" onClick={() => navigate(`/album/${id}/pages`)} className={styles.secondary}>
           חזרה לעריכה
         </button>
-        <button type="button" onClick={() => navigate(`/album/${id}/done`)} className={styles.cta}>
-          סיום
+        <button
+          type="button"
+          onClick={() => navigate(`/album/${id}/pages`, { state: { openPdfFinish: true } })}
+          className={styles.cta}
+        >
+          המשך ליצירת PDF
         </button>
       </div>
 
