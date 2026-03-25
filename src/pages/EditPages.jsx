@@ -4177,17 +4177,6 @@ export default function EditPages() {
           <span className={styles.studioTopBtnIcon} aria-hidden>✎</span>
           עריכת עמוד
         </button>
-        <button
-          type="button"
-          className={styles.studioTopBtn}
-          onClick={() => void handleFinishAndDownload()}
-          disabled={generatingPdf}
-          title="סיום והורדת PDF"
-          aria-label="סיום והורדת PDF"
-        >
-          <span className={styles.studioTopBtnIcon} aria-hidden>↓</span>
-          <span>{generatingPdf ? "מכין…" : "סיום והורדת PDF"}</span>
-        </button>
         </div>
 
       {viewIndex > 0 && (
