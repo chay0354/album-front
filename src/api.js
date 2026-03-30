@@ -239,15 +239,50 @@ export function getPremadeCoverUrl(storagePath) {
   return `${import.meta.env.VITE_SUPABASE_URL || ""}/storage/v1/object/public/premade-covers/${storagePath}`;
 }
 
+/** Bundled decorations (always available; no Storage upload). Paths are site-root URLs. */
+export const BUILTIN_PAGE_ELEMENTS = [
+  { path: "/builtin-elements/dec-01-heart.svg" },
+  { path: "/builtin-elements/dec-02-star.svg" },
+  { path: "/builtin-elements/dec-03-flower.svg" },
+  { path: "/builtin-elements/dec-04-leaf.svg" },
+  { path: "/builtin-elements/dec-05-sun.svg" },
+  { path: "/builtin-elements/dec-06-moon.svg" },
+  { path: "/builtin-elements/dec-07-cloud.svg" },
+  { path: "/builtin-elements/dec-08-sparkle.svg" },
+  { path: "/builtin-elements/dec-09-ribbon.svg" },
+  { path: "/builtin-elements/dec-10-frame.svg" },
+  { path: "/builtin-elements/dec-11-scallop.svg" },
+  { path: "/builtin-elements/dec-12-banner.svg" },
+  { path: "/builtin-elements/dec-13-ring.svg" },
+  { path: "/builtin-elements/dec-14-clover.svg" },
+  { path: "/builtin-elements/dec-15-butterfly.svg" },
+  { path: "/builtin-elements/dec-16-balloon.svg" },
+  { path: "/builtin-elements/dec-17-crown.svg" },
+  { path: "/builtin-elements/dec-18-music.svg" },
+  { path: "/builtin-elements/dec-19-camera.svg" },
+  { path: "/builtin-elements/dec-20-gift.svg" },
+];
+
 export async function getElementsList() {
-  const r = await fetch(`${API}/covers/elements`);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  let remote = [];
+  try {
+    const r = await fetch(`${API}/covers/elements`);
+    if (r.ok) {
+      const j = await r.json();
+      remote = Array.isArray(j) ? j : [];
+    }
+  } catch {
+    /* offline / API down — still show builtins */
+  }
+  const seen = new Set(remote.map((x) => x?.path).filter(Boolean));
+  const extra = BUILTIN_PAGE_ELEMENTS.filter((b) => b.path && !seen.has(b.path));
+  return [...remote, ...extra];
 }
 
 export function getElementUrl(storagePath) {
   if (!storagePath) return null;
   if (storagePath.startsWith("http")) return storagePath;
+  if (storagePath.startsWith("/")) return storagePath;
   return `${import.meta.env.VITE_SUPABASE_URL || ""}/storage/v1/object/public/elements/${storagePath}`;
 }
 

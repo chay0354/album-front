@@ -5,7 +5,7 @@ import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import styles from "./PagesCount.module.css";
 
-const PAGE_OPTIONS = [24, 34, 50, 74, 100, 120];
+const PAGE_OPTIONS = [26, 36, 50, 76, 100, 120, 140];
 
 export default function PagesCount() {
   const { id } = useParams();

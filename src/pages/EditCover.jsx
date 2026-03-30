@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getAlbum, updateAlbum, getPremadeCoverList, uploadCover, getPremadeCoverUrl } from "../api";
 import StageIndicator from "../components/StageIndicator";
@@ -97,6 +97,32 @@ export default function EditCover() {
 
   const selectedText = texts.find((t) => t.id === selectedTextId);
 
+  const resolvedCoverUrl = useMemo(
+    () => uploadedCoverUrl || (selectedPremadePath ? getPremadeCoverUrl(selectedPremadePath) : null),
+    [uploadedCoverUrl, selectedPremadePath]
+  );
+
+  const buildCoverConfigPayload = useCallback(() => {
+    const prev = album?.cover_config || {};
+    const nextTexts = texts
+      .filter((t) => t.content.trim() !== "")
+      .map((t) => ({
+        id: t.id,
+        content: t.content,
+        x: t.x,
+        y: t.y,
+        fontSize: t.fontSize,
+        color: isValidHex(t.color) ? t.color : DEFAULT_COLOR,
+        fontFamily: t.fontFamily || DEFAULT_FONT,
+      }));
+    return {
+      ...prev,
+      userEmail,
+      texts: nextTexts,
+      ...(resolvedCoverUrl ? { coverUrl: resolvedCoverUrl } : {}),
+    };
+  }, [album?.cover_config, userEmail, texts, resolvedCoverUrl]);
+
   const updateText = useCallback((id, updates) => {
     setTexts((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
   }, []);
@@ -177,18 +203,29 @@ export default function EditCover() {
     setSelectedPremadePath(path);
   }
 
+  const autosaveTimerRef = useRef(null);
+  useEffect(() => {
+    if (!album) return;
+    window.clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = window.setTimeout(() => {
+      autosaveTimerRef.current = null;
+      const cfg = buildCoverConfigPayload();
+      updateAlbum(id, { cover_config: cfg }).catch(() => {
+        /* silent — "המשך" saves again; avoids losing work when skipping Continue */
+      });
+    }, 700);
+    return () => window.clearTimeout(autosaveTimerRef.current);
+  }, [id, album, buildCoverConfigPayload]);
+
   async function handleNext() {
     setSaving(true);
     setError(null);
     try {
-      const coverUrl = uploadedCoverUrl || (selectedPremadePath ? getPremadeCoverUrl(selectedPremadePath) : null);
-      await updateAlbum(id, {
-        cover_config: {
-          userEmail,
-          coverUrl: coverUrl || undefined,
-          texts: texts.filter((t) => t.content.trim() !== "").map(({ id: _id, ...t }) => t),
-        },
-      });
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+      const cfg = buildCoverConfigPayload();
+      const row = await updateAlbum(id, { cover_config: cfg });
+      setAlbum((a) => (a && row ? { ...a, cover_config: row.cover_config ?? cfg } : a));
       navigate(`/album/${id}/pages-count`);
     } catch (err) {
       setError(err.message);
@@ -199,8 +236,7 @@ export default function EditCover() {
 
   if (!album) return <AlbumLoading />;
 
-  const currentCoverUrl = uploadedCoverUrl || (selectedPremadePath ? getPremadeCoverUrl(selectedPremadePath) : null);
-  const customCoverUrl = currentCoverUrl; // alias so any reference to customCoverUrl works
+  const currentCoverUrl = resolvedCoverUrl;
 
   return (
     <div className={styles.page}>

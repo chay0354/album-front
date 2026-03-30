@@ -330,6 +330,45 @@ const PAGE_TEMPLATES = [
   { id: "2-v", name: "2 אנכי", slots: [{ x: 10, y: 2, w: 80, h: 46, rotation: 0 }, { x: 10, y: 52, w: 80, h: 46, rotation: 0 }] },
   { id: "3-l", name: "3 (גדול+2)", slots: [{ x: 2, y: 5, w: 48, h: 90, rotation: 0 }, { x: 52, y: 5, w: 46, h: 43, rotation: 0 }, { x: 52, y: 52, w: 46, h: 46, rotation: 0 }] },
   { id: "4-grid", name: "4 רשת", slots: [{ x: 2, y: 2, w: 46, h: 46, rotation: 0 }, { x: 52, y: 2, w: 46, h: 46, rotation: 0 }, { x: 2, y: 52, w: 46, h: 46, rotation: 0 }, { x: 52, y: 52, w: 46, h: 46, rotation: 0 }] },
+  {
+    id: "6-grid",
+    name: "6 רשת",
+    slots: [
+      { x: 2, y: 2, w: 47, h: 30, rotation: 0 },
+      { x: 51, y: 2, w: 47, h: 30, rotation: 0 },
+      { x: 2, y: 34, w: 47, h: 30, rotation: 0 },
+      { x: 51, y: 34, w: 47, h: 30, rotation: 0 },
+      { x: 2, y: 66, w: 47, h: 32, rotation: 0 },
+      { x: 51, y: 66, w: 47, h: 32, rotation: 0 },
+    ],
+  },
+  {
+    id: "1-wide-2",
+    name: "רחב למעלה + 2",
+    slots: [
+      { x: 2, y: 2, w: 96, h: 38, rotation: 0 },
+      { x: 2, y: 44, w: 46, h: 54, rotation: 0 },
+      { x: 52, y: 44, w: 46, h: 54, rotation: 0 },
+    ],
+  },
+  {
+    id: "col-2side",
+    name: "עמודה + 2 ליד",
+    slots: [
+      { x: 2, y: 2, w: 38, h: 96, rotation: 0 },
+      { x: 44, y: 2, w: 54, h: 46, rotation: 0 },
+      { x: 44, y: 52, w: 54, h: 46, rotation: 0 },
+    ],
+  },
+  {
+    id: "3-rows",
+    name: "3 פסים",
+    slots: [
+      { x: 4, y: 2, w: 92, h: 30, rotation: 0 },
+      { x: 4, y: 35, w: 92, h: 30, rotation: 0 },
+      { x: 4, y: 68, w: 92, h: 30, rotation: 0 },
+    ],
+  },
 ];
 
 /** Mini page (3:4) with dashed slots + — matches full-screen template placeholders */
@@ -444,7 +483,6 @@ async function captureVisibleElementToPdfJpeg(el) {
     dataUrl = await domToJpeg(el, {
       quality: 0.95,
       scale: pr,
-      backgroundColor: "#ffffff",
       fetch: { bypassingCache: true },
       drawImageInterval: 150,
       timeout: 45000,
@@ -456,7 +494,6 @@ async function captureVisibleElementToPdfJpeg(el) {
         quality: 0.93,
         pixelRatio: pr,
         cacheBust: true,
-        backgroundColor: "#ffffff",
         skipFonts: false,
       });
     } catch (e2) {
@@ -466,7 +503,7 @@ async function captureVisibleElementToPdfJpeg(el) {
         useCORS: true,
         foreignObjectRendering: true,
         logging: false,
-        backgroundColor: "#ffffff",
+        backgroundColor: null,
         imageTimeout: 20000,
         scrollX: 0,
         scrollY: -window.scrollY,
@@ -1354,6 +1391,14 @@ function FullScreenPageEditor({ page, pageLabel, photos, albumId, getPhotoUrl, o
 
   return (
     <div className={styles.fullScreenOverlay} onClick={(e) => { if (e.target === e.currentTarget) { setSelectedId(null); setSelectedStickerId(null); setSelectedTextId(null); setShowCropPanel(false); } }}>
+      {uploading && (
+        <div className={styles.editorUploadBusyOverlay} role="status" aria-live="polite" aria-busy="true">
+          <div className={styles.editorUploadBusyCard}>
+            <span className={styles.editorUploadSpinner} aria-hidden />
+            <span>מעלה תמונות…</span>
+          </div>
+        </div>
+      )}
       {showCropPanel && selectedId && selectedLayout && selectedPhoto && (
         <div className={styles.cropModalBackdrop} onClick={() => setShowCropPanel(false)} aria-hidden={false}>
           <div
@@ -2381,9 +2426,245 @@ function PageStickers({ stickers, getElementUrl }) {
 const SPREAD_LAYOUT_MIN = 8;
 const SPREAD_LAYOUT_MAX = 100;
 const SPREAD_SNAP_THRESHOLD = 2.5;
+/** Wider catch when a page template is active — aligns to slot grid and neighbors more reliably. */
+const SPREAD_SNAP_THRESHOLD_TEMPLATE = 4.25;
+const SPREAD_SNAP_RESIZE_THRESHOLD = 3.5;
+
+function uniqSpreadSnapTargets(values) {
+  const seen = new Set();
+  const out = [];
+  for (const v of values) {
+    if (typeof v !== "number" || !Number.isFinite(v)) continue;
+    const key = Math.round(v * 500) / 500;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(v);
+  }
+  return out;
+}
+
+/** Page bounds (0 / 50 / 100), template slot edges & centers, and other photos — all in % of the half-page. */
+function buildSpreadSnapTargets(templateSlots, layoutsById, otherPhotoIds) {
+  const vRaw = [0, 50, SPREAD_LAYOUT_MAX];
+  const hRaw = [0, 50, SPREAD_LAYOUT_MAX];
+  if (Array.isArray(templateSlots)) {
+    for (const slot of templateSlots) {
+      if (!slot || typeof slot.x !== "number" || typeof slot.w !== "number") continue;
+      const sx = slot.x;
+      const sy = typeof slot.y === "number" ? slot.y : 0;
+      const sw = slot.w;
+      const sh = typeof slot.h === "number" ? slot.h : 0;
+      vRaw.push(sx, sx + sw / 2, sx + sw);
+      hRaw.push(sy, sy + sh / 2, sy + sh);
+    }
+  }
+  for (const oid of otherPhotoIds) {
+    const o = layoutsById[oid];
+    if (o && typeof o.x === "number") {
+      vRaw.push(o.x, o.x + (o.w || 0) / 2, o.x + (o.w || 0));
+      hRaw.push(o.y, o.y + (o.h || 0) / 2, o.y + (o.h || 0));
+    }
+  }
+  return { vTargets: uniqSpreadSnapTargets(vRaw), hTargets: uniqSpreadSnapTargets(hRaw) };
+}
+
+function nearestSpreadSnapTarget(val, targets, threshold) {
+  let best = null;
+  let bestD = threshold;
+  for (const t of targets) {
+    const d = Math.abs(val - t);
+    if (d < bestD) {
+      bestD = d;
+      best = t;
+    }
+  }
+  return best;
+}
+
+/**
+ * After aspect-locked resize, pull the active corner toward template / neighbor guides (same rails as drag).
+ */
+function snapSpreadResizeToTargets(handle, rect, startLayout, k, vTargets, hTargets, threshold, minS, maxXY) {
+  const kk = Math.max(k, 1e-9);
+  const l0 = startLayout;
+  const ar0 = l0.x + l0.w;
+  const ab0 = l0.y + l0.h;
+  let w = rect.w;
+  let h = rect.h;
+  let didSnap = false;
+
+  const nvR = (val) => nearestSpreadSnapTarget(val, vTargets, threshold);
+  const nhR = (val) => nearestSpreadSnapTarget(val, hTargets, threshold);
+
+  if (handle === "se") {
+    const fx = l0.x;
+    const fy = l0.y;
+    const mx = rect.x + rect.w;
+    const my = rect.y + rect.h;
+    const nv = nvR(mx);
+    const nh = nhR(my);
+    if (nv != null && nh != null) {
+      const wV = nv - fx;
+      const hV = wV / kk;
+      const hH = nh - fy;
+      const wH = hH * kk;
+      const topV = fy + hV;
+      const errV = Math.abs(nh - topV);
+      const errH = Math.abs(nv - (fx + wH));
+      if (errV <= errH) {
+        w = wV;
+        h = hV;
+      } else {
+        w = wH;
+        h = hH;
+      }
+      didSnap = true;
+    } else if (nv != null) {
+      w = nv - fx;
+      h = w / kk;
+      didSnap = true;
+    } else if (nh != null) {
+      h = nh - fy;
+      w = h * kk;
+      didSnap = true;
+    }
+  } else if (handle === "sw") {
+    const fxRight = ar0;
+    const fyTop = l0.y;
+    const mx = rect.x;
+    const my = rect.y + rect.h;
+    const nv = nvR(mx);
+    const nh = nhR(my);
+    if (nv != null && nh != null) {
+      const wV = fxRight - nv;
+      const hV = wV / kk;
+      const hH = nh - fyTop;
+      const wH = hH * kk;
+      const errV = Math.abs(nh - (fyTop + hV));
+      const errH = Math.abs(nv - (fxRight - wH));
+      if (errV <= errH) {
+        w = wV;
+        h = hV;
+      } else {
+        w = wH;
+        h = hH;
+      }
+      didSnap = true;
+    } else if (nv != null) {
+      w = fxRight - nv;
+      h = w / kk;
+      didSnap = true;
+    } else if (nh != null) {
+      h = nh - fyTop;
+      w = h * kk;
+      didSnap = true;
+    }
+  } else if (handle === "ne") {
+    const fxLeft = l0.x;
+    const fyBottom = ab0;
+    const mx = rect.x + rect.w;
+    const my = rect.y;
+    const nv = nvR(mx);
+    const nh = nhR(my);
+    if (nv != null && nh != null) {
+      const wV = nv - fxLeft;
+      const hV = wV / kk;
+      const hH = fyBottom - nh;
+      const wH = hH * kk;
+      const topFromV = fyBottom - hV;
+      const errV = Math.abs(topFromV - nh);
+      const errH = Math.abs(fxLeft + wH - nv);
+      if (errV <= errH) {
+        w = wV;
+        h = hV;
+      } else {
+        w = wH;
+        h = hH;
+      }
+      didSnap = true;
+    } else if (nv != null) {
+      w = nv - fxLeft;
+      h = w / kk;
+      didSnap = true;
+    } else if (nh != null) {
+      h = fyBottom - nh;
+      w = h * kk;
+      didSnap = true;
+    }
+  } else if (handle === "nw") {
+    const fxRight = ar0;
+    const fyBottom = ab0;
+    const mx = rect.x;
+    const my = rect.y;
+    const nv = nvR(mx);
+    const nh = nhR(my);
+    if (nv != null && nh != null) {
+      const wV = fxRight - nv;
+      const hV = wV / kk;
+      const hH = fyBottom - nh;
+      const wH = hH * kk;
+      const topFromV = fyBottom - hV;
+      const errV = Math.abs(topFromV - nh);
+      const errH = Math.abs(fxRight - wH - nv);
+      if (errV <= errH) {
+        w = wV;
+        h = hV;
+      } else {
+        w = wH;
+        h = hH;
+      }
+      didSnap = true;
+    } else if (nv != null) {
+      w = fxRight - nv;
+      h = w / kk;
+      didSnap = true;
+    } else if (nh != null) {
+      h = fyBottom - nh;
+      w = h * kk;
+      didSnap = true;
+    }
+  }
+
+  if (!didSnap) return { x: rect.x, y: rect.y, w: rect.w, h: rect.h };
+
+  let maxW = maxXY;
+  let maxH = maxXY;
+  if (handle === "se") {
+    maxW = maxXY - l0.x;
+    maxH = maxXY - l0.y;
+  } else if (handle === "sw") {
+    maxW = ar0;
+    maxH = maxXY - l0.y;
+  } else if (handle === "ne") {
+    maxW = maxXY - l0.x;
+    maxH = ab0;
+  } else if (handle === "nw") {
+    maxW = ar0;
+    maxH = ab0;
+  }
+  const fitted = fitBoxToAspectBounds(w, h, kk, minS, maxW, maxH);
+  w = fitted.w;
+  h = fitted.h;
+  let x;
+  let y;
+  if (handle === "se") {
+    x = l0.x;
+    y = l0.y;
+  } else if (handle === "sw") {
+    x = ar0 - w;
+    y = l0.y;
+  } else if (handle === "ne") {
+    x = l0.x;
+    y = ab0 - h;
+  } else {
+    x = ar0 - w;
+    y = ab0 - h;
+  }
+  return { x, y, w, h };
+}
 
 /** Studio spread: free-form layout with tap-to-select, corner resize, and drag (same % model as full editor). */
-function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhoto, onPersistLayout }) {
+function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhoto, onPersistLayout, templateSlots }) {
   const containerRef = useRef(null);
   const sorted = useMemo(() => [...photos].sort((a, b) => a.photo_order - b.photo_order), [photos]);
   const layoutSyncKey = sorted.map((p) => `${p.id}:${p.photo_order}:${JSON.stringify(p.layout ?? null)}`).join(";");
@@ -2450,7 +2731,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
         const { x: pctX, y: pctY } = toPct(getCoords(ev).x, getCoords(ev).y);
         const l = ref.startLayout;
         const k = ref.aspectK;
-        const { x: newX, y: newY, w: newW, h: newH } = resizeLayoutKeepImageAspect(
+        let { x: newX, y: newY, w: newW, h: newH } = resizeLayoutKeepImageAspect(
           ref.handle,
           l,
           pctX,
@@ -2459,6 +2740,24 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
           SPREAD_LAYOUT_MIN,
           SPREAD_LAYOUT_MAX
         );
+        const otherIds = sorted.filter((p) => p.id !== ref.photoId).map((p) => p.id);
+        const { vTargets, hTargets } = buildSpreadSnapTargets(templateSlots, layoutsRef.current, otherIds);
+        const resizeTh = templateSlots?.length ? SPREAD_SNAP_RESIZE_THRESHOLD : SPREAD_SNAP_RESIZE_THRESHOLD * 0.85;
+        const snapped = snapSpreadResizeToTargets(
+          ref.handle,
+          { x: newX, y: newY, w: newW, h: newH },
+          l,
+          k,
+          vTargets,
+          hTargets,
+          resizeTh,
+          SPREAD_LAYOUT_MIN,
+          SPREAD_LAYOUT_MAX
+        );
+        newX = snapped.x;
+        newY = snapped.y;
+        newW = snapped.w;
+        newH = snapped.h;
         setLayouts((prev) => ({
           ...prev,
           [ref.photoId]: { ...(prev[ref.photoId] || l), x: newX, y: newY, w: newW, h: newH },
@@ -2483,7 +2782,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
       window.addEventListener("touchmove", onMove, opts);
       window.addEventListener("touchend", onUp);
     },
-    [getCoords, onSelectPhoto, onPersistLayout]
+    [getCoords, onSelectPhoto, onPersistLayout, sorted, templateSlots]
   );
 
   const handlePhotoPointerDown = useCallback(
@@ -2502,6 +2801,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
+      const snapTh = templateSlots?.length ? SPREAD_SNAP_THRESHOLD_TEMPLATE : SPREAD_SNAP_THRESHOLD;
       const onMove = (ev) => {
         ev.preventDefault();
         const ref = dragRef.current;
@@ -2523,15 +2823,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
         const guides = { vertical: [], horizontal: [] };
         const currentLayouts = layoutsRef.current;
         const otherIds = sorted.filter((p) => p.id !== ref.id).map((p) => p.id);
-        const vTargets = [0, 50, SPREAD_LAYOUT_MAX];
-        const hTargets = [0, 50, SPREAD_LAYOUT_MAX];
-        otherIds.forEach((oid) => {
-          const o = currentLayouts[oid];
-          if (o && typeof o.x === "number") {
-            vTargets.push(o.x, o.x + (o.w || 0) / 2, o.x + (o.w || 0));
-            hTargets.push(o.y, o.y + (o.h || 0) / 2, o.y + (o.h || 0));
-          }
-        });
+        const { vTargets, hTargets } = buildSpreadSnapTargets(templateSlots, currentLayouts, otherIds);
         const dragLeft = newX;
         const dragCenterX = newX + (l.w || 0) / 2;
         const dragRight = newX + (l.w || 0);
@@ -2540,7 +2832,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
         const dragBottom = newY + (l.h || 0);
         let bestV = null;
         let bestVAnchor = 0;
-        let bestVDist = SPREAD_SNAP_THRESHOLD;
+        let bestVDist = snapTh;
         vTargets.forEach((t) => {
           const dLeft = Math.abs(dragLeft - t);
           const dCenter = Math.abs(dragCenterX - t);
@@ -2563,7 +2855,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
         });
         let bestH = null;
         let bestHAnchor = 0;
-        let bestHDist = SPREAD_SNAP_THRESHOLD;
+        let bestHDist = snapTh;
         hTargets.forEach((t) => {
           const dTop = Math.abs(dragTop - t);
           const dCenter = Math.abs(dragCenterY - t);
@@ -2626,7 +2918,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
       window.addEventListener("touchend", onUp);
       window.addEventListener("touchcancel", onUp);
     },
-    [getCoords, onSelectPhoto, onPersistLayout, selectedPhotoId, sorted]
+    [getCoords, onSelectPhoto, onPersistLayout, selectedPhotoId, sorted, templateSlots]
   );
 
   const renderOrder = useMemo(() => {
@@ -2644,7 +2936,13 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
   return (
     <div ref={containerRef} className={styles.pagePhotosAbsolute}>
       {(guideLines.vertical.length > 0 || guideLines.horizontal.length > 0) && (
-        <div className={`${styles.editorGuideLines} ${styles.spreadGuideLines}`} aria-hidden>
+        <div
+          className={
+            `${styles.editorGuideLines} ${styles.spreadGuideLines}` +
+            (templateSlots?.length ? ` ${styles.spreadGuideLinesTemplate}` : "")
+          }
+          aria-hidden
+        >
           {guideLines.vertical.map((xv) => (
             <div key={`v-${xv}`} className={styles.editorGuideLineV} style={{ left: `${xv}%` }} />
           ))}
@@ -3160,6 +3458,7 @@ function AlbumSpread({
               selectedPhotoId={studioPhotoSel?.pageId === leftPage.id ? studioPhotoSel.photoId : null}
               onSelectPhoto={(photoId) => onStudioSelectPhoto?.(photoId ? { pageId: leftPage.id, photoId } : null)}
               onPersistLayout={onPersistSpreadPhotoLayout}
+              templateSlots={leftPage.page_config?.studioTemplate?.slots}
             />
           ) : (
           <PagePhotos
@@ -3260,6 +3559,7 @@ function AlbumSpread({
               selectedPhotoId={studioPhotoSel?.pageId === rightPage.id ? studioPhotoSel.photoId : null}
               onSelectPhoto={(photoId) => onStudioSelectPhoto?.(photoId ? { pageId: rightPage.id, photoId } : null)}
               onPersistLayout={onPersistSpreadPhotoLayout}
+              templateSlots={rightPage.page_config?.studioTemplate?.slots}
             />
           ) : (
           <PagePhotos
@@ -3381,6 +3681,7 @@ export default function EditPages() {
   const [studioUploading, setStudioUploading] = useState(false);
   const [undoDepth, setUndoDepth] = useState(0);
   const [redoDepth, setRedoDepth] = useState(0);
+  const [historyBusy, setHistoryBusy] = useState(false);
   const [bgDraftColor, setBgDraftColor] = useState(DEFAULT_PAGE_BG);
   const studioFileInputRef = useRef(null);
   const uploadTargetPageIdRef = useRef(null);
@@ -3390,7 +3691,17 @@ export default function EditPages() {
   const studioCropPersistTimerRef = useRef(null);
   const undoConfigStack = useRef([]);
   const redoConfigStack = useRef([]);
+  const albumLatestRef = useRef(null);
+  const studioCropUndoPushedRef = useRef(false);
   const dockScrollRef = useRef(null);
+
+  useEffect(() => {
+    albumLatestRef.current = album;
+  }, [album]);
+
+  useEffect(() => {
+    if (showStudioCropSheet) studioCropUndoPushedRef.current = false;
+  }, [showStudioCropSheet]);
 
   useEffect(() => {
     getAlbum(id).then(setAlbum).catch((e) => setError(e.message));
@@ -3410,10 +3721,8 @@ export default function EditPages() {
 
     const pagesSorted = [...(album?.pages || [])].sort((a, b) => (a.page_order ?? 0) - (b.page_order ?? 0));
     const captureSteps = [{ kind: "cover" }];
-    pagesSorted.forEach((p, pageIndex) => {
-      const photos = (p.album_photos || []).sort((a, b) => a.photo_order - b.photo_order);
-      const texts = Array.isArray(p.page_config?.texts) ? p.page_config.texts : [];
-      if (photos.length === 0 && texts.length === 0) return;
+    /* Every album page = one PDF half-page, even if empty (background / stickers / placeholders). */
+    pagesSorted.forEach((_, pageIndex) => {
       captureSteps.push({
         kind: "half",
         pageIndex,
@@ -3622,17 +3931,49 @@ export default function EditPages() {
 
   const coverUrl = coverImageUrl ?? album?.cover_config?.coverUrl ?? null;
 
-  function pushUndoSnapshot(pageId) {
-    const p = album?.pages?.find((x) => x.id === pageId);
+  function collectPhotoLayoutsSnapshot(page) {
+    if (!page) return {};
+    const out = {};
+    const ordered = [...(page.album_photos || [])].sort((a, b) => a.photo_order - b.photo_order);
+    ordered.forEach((ph, i) => {
+      out[ph.id] = JSON.parse(
+        JSON.stringify(
+          ph.layout && typeof ph.layout.x === "number"
+            ? { ...DEFAULT_LAYOUT(i), ...ph.layout, rotation: ph.layout.rotation ?? 0 }
+            : DEFAULT_LAYOUT(i)
+        )
+      );
+    });
+    return out;
+  }
+
+  /** Pass `albumSource` (e.g. await getAlbum) so the snapshot matches the DB before a write; otherwise uses latest ref. */
+  function pushUndoSnapshot(pageId, albumSource) {
+    const src = albumSource !== undefined ? albumSource : albumLatestRef.current;
+    const p = src?.pages?.find((x) => x.id === pageId);
     if (!p) return;
     undoConfigStack.current.push({
       pageId,
       page_config: JSON.parse(JSON.stringify(p.page_config || {})),
+      photoLayouts: collectPhotoLayoutsSnapshot(p),
     });
     redoConfigStack.current = [];
     if (undoConfigStack.current.length > 40) undoConfigStack.current.shift();
     setUndoDepth(undoConfigStack.current.length);
     setRedoDepth(0);
+  }
+
+  async function applyPageUndoState(pageId, page_config, photoLayouts) {
+    const layouts = photoLayouts || {};
+    const fresh = await getAlbum(id);
+    const page = fresh.pages?.find((x) => x.id === pageId);
+    const idsOnPage = new Set((page?.album_photos || []).map((ph) => String(ph.id)));
+    for (const [photoId, layout] of Object.entries(layouts)) {
+      if (!idsOnPage.has(String(photoId))) continue;
+      await updatePhotoLayout(id, photoId, JSON.parse(JSON.stringify(layout)));
+    }
+    await updatePageConfig(id, pageId, page_config);
+    await refreshAlbum();
   }
 
   async function undoLastConfig() {
@@ -3642,18 +3983,24 @@ export default function EditPages() {
       return;
     }
     const cur = album.pages?.find((x) => x.id === snap.pageId);
-    const forward = cur ? JSON.parse(JSON.stringify(cur.page_config || {})) : {};
+    const forward = {
+      pageId: snap.pageId,
+      page_config: cur ? JSON.parse(JSON.stringify(cur.page_config || {})) : {},
+      photoLayouts: collectPhotoLayoutsSnapshot(cur),
+    };
     try {
+      setHistoryBusy(true);
       setError(null);
-      await updatePageConfig(id, snap.pageId, snap.page_config);
-      redoConfigStack.current.push({ pageId: snap.pageId, page_config: forward });
+      await applyPageUndoState(snap.pageId, snap.page_config, snap.photoLayouts);
+      redoConfigStack.current.push(forward);
       setUndoDepth(undoConfigStack.current.length);
       setRedoDepth(redoConfigStack.current.length);
-      await refreshAlbum();
     } catch (e) {
       undoConfigStack.current.push(snap);
       setUndoDepth(undoConfigStack.current.length);
       setError(e.message);
+    } finally {
+      setHistoryBusy(false);
     }
   }
 
@@ -3664,18 +4011,24 @@ export default function EditPages() {
       return;
     }
     const cur = album.pages?.find((x) => x.id === snap.pageId);
-    const back = cur ? JSON.parse(JSON.stringify(cur.page_config || {})) : {};
+    const back = {
+      pageId: snap.pageId,
+      page_config: cur ? JSON.parse(JSON.stringify(cur.page_config || {})) : {},
+      photoLayouts: collectPhotoLayoutsSnapshot(cur),
+    };
     try {
+      setHistoryBusy(true);
       setError(null);
-      await updatePageConfig(id, snap.pageId, snap.page_config);
-      undoConfigStack.current.push({ pageId: snap.pageId, page_config: back });
+      await applyPageUndoState(snap.pageId, snap.page_config, snap.photoLayouts);
+      undoConfigStack.current.push(back);
       setUndoDepth(undoConfigStack.current.length);
       setRedoDepth(redoConfigStack.current.length);
-      await refreshAlbum();
     } catch (e) {
       redoConfigStack.current.push(snap);
       setRedoDepth(redoConfigStack.current.length);
       setError(e.message);
+    } finally {
+      setHistoryBusy(false);
     }
   }
 
@@ -3846,6 +4199,7 @@ export default function EditPages() {
     if (!pid || viewIndex === 0) return;
     const page = pages.find((p) => p.id === pid);
     if (!page) return;
+    pushUndoSnapshot(pid);
     const slots = template.slots || [];
     const studioTemplate = { id: template.id, name: template.name, slots };
     try {
@@ -3861,6 +4215,8 @@ export default function EditPages() {
       await refreshAlbum();
       setShowLayoutSheet(false);
     } catch (e) {
+      undoConfigStack.current.pop();
+      setUndoDepth(undoConfigStack.current.length);
       setError(e.message);
     }
   }
@@ -3876,12 +4232,15 @@ export default function EditPages() {
     }
     const pc = { ...(page.page_config || {}) };
     delete pc.studioTemplate;
+    pushUndoSnapshot(pid);
     try {
       setError(null);
       await updatePageConfig(id, pid, pc);
       await refreshAlbum();
       setShowLayoutSheet(false);
     } catch (e) {
+      undoConfigStack.current.pop();
+      setUndoDepth(undoConfigStack.current.length);
       setError(e.message);
     }
   }
@@ -3917,11 +4276,22 @@ export default function EditPages() {
   const activePageOrderLabel = activePageForTools ? (activePageForTools.page_order ?? 0) + 1 : null;
 
   async function handlePersistSpreadPhotoLayout(photoId, layout) {
+    let fresh = album;
+    try {
+      fresh = await getAlbum(id);
+    } catch {
+      /* use album from state */
+    }
+    const page = fresh?.pages?.find((p) => (p.album_photos || []).some((ph) => ph.id === photoId));
+    if (!page) return;
+    pushUndoSnapshot(page.id, fresh);
     try {
       setError(null);
       await updatePhotoLayout(id, photoId, layout);
       await refreshAlbum();
     } catch (e) {
+      undoConfigStack.current.pop();
+      setUndoDepth(undoConfigStack.current.length);
       setError(e.message);
     }
   }
@@ -3929,6 +4299,7 @@ export default function EditPages() {
   async function handlePersistSpreadStickerLayout(pageId, stickerId, layout) {
     const page = album?.pages?.find((p) => p.id === pageId);
     if (!page) return;
+    pushUndoSnapshot(pageId);
     try {
       setError(null);
       const cfg = { ...(page.page_config || {}) };
@@ -3946,6 +4317,8 @@ export default function EditPages() {
       await updatePageConfig(id, pageId, { ...cfg, stickers: list });
       await refreshAlbum();
     } catch (e) {
+      undoConfigStack.current.pop();
+      setUndoDepth(undoConfigStack.current.length);
       setError(e.message);
     }
   }
@@ -3968,17 +4341,24 @@ export default function EditPages() {
   }
 
   function scheduleStudioCropPersist(nextCrop) {
+    const capPhotoId = studioPhotoSel?.photoId;
     studioCropDraftRef.current = nextCrop;
     setStudioCropDraft(nextCrop);
     if (studioCropPersistTimerRef.current) window.clearTimeout(studioCropPersistTimerRef.current);
     studioCropPersistTimerRef.current = window.setTimeout(async () => {
       studioCropPersistTimerRef.current = null;
       const base = studioSpreadLayoutBaseRef.current;
-      const photoId = studioPhotoSel?.photoId;
-      if (!base || !photoId) return;
+      if (!base || !capPhotoId) return;
       try {
         setError(null);
-        await updatePhotoLayout(id, photoId, { ...base, crop: nextCrop });
+        if (!studioCropUndoPushedRef.current) {
+          const pg = albumLatestRef.current?.pages?.find((p) =>
+            (p.album_photos || []).some((ph) => ph.id === capPhotoId)
+          );
+          if (pg) pushUndoSnapshot(pg.id);
+          studioCropUndoPushedRef.current = true;
+        }
+        await updatePhotoLayout(id, capPhotoId, { ...base, crop: nextCrop });
         await refreshAlbum();
       } catch (e) {
         setError(e.message);
@@ -4007,11 +4387,14 @@ export default function EditPages() {
       window.clearTimeout(studioCropPersistTimerRef.current);
       studioCropPersistTimerRef.current = null;
     }
+    pushUndoSnapshot(studioSelPhotoDetail.pageId);
     try {
       setError(null);
       await updatePhotoLayout(id, studioSelPhotoDetail.photo.id, { ...base, crop: next });
       await refreshAlbum();
     } catch (e) {
+      undoConfigStack.current.pop();
+      setUndoDepth(undoConfigStack.current.length);
       setError(e.message);
     }
   }
@@ -4040,6 +4423,13 @@ export default function EditPages() {
       if (base && photoId) {
         try {
           setError(null);
+          if (!studioCropUndoPushedRef.current) {
+            const pg = albumLatestRef.current?.pages?.find((p) =>
+              (p.album_photos || []).some((ph) => ph.id === photoId)
+            );
+            if (pg) pushUndoSnapshot(pg.id);
+            studioCropUndoPushedRef.current = true;
+          }
           await updatePhotoLayout(id, photoId, { ...base, crop });
           await refreshAlbum();
         } catch (e) {
@@ -4118,6 +4508,15 @@ export default function EditPages() {
         }}
       />
 
+      {studioUploading && (
+        <div className={styles.editorUploadBusyOverlay} role="status" aria-live="polite" aria-busy="true">
+          <div className={styles.editorUploadBusyCard}>
+            <span className={styles.editorUploadSpinner} aria-hidden />
+            <span>מעלה תמונות…</span>
+          </div>
+        </div>
+      )}
+
       <StageIndicator current={3} className={styles.studioStageIndicator} />
 
       <div className={styles.studioTopBar}>
@@ -4137,8 +4536,8 @@ export default function EditPages() {
         <button
           type="button"
           className={styles.studioTopBtn}
-          disabled={undoDepth === 0}
-          onClick={() => undoLastConfig()}
+          disabled={undoDepth === 0 || historyBusy}
+          onClick={() => void undoLastConfig()}
           title="בטל"
         >
           <span className={styles.studioTopBtnIcon} aria-hidden>↶</span>
@@ -4147,8 +4546,8 @@ export default function EditPages() {
         <button
           type="button"
           className={styles.studioTopBtn}
-          disabled={redoDepth === 0}
-          onClick={() => redoLastConfig()}
+          disabled={redoDepth === 0 || historyBusy}
+          onClick={() => void redoLastConfig()}
           title="בצע שוב"
         >
           <span className={styles.studioTopBtnIcon} aria-hidden>↷</span>

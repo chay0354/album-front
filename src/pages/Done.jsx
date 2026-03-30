@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { useParams, useLocation, Link } from "react-router-dom";
 import { getAlbum, updateAlbum } from "../api";
 import { getLocalPdfBlob } from "../pdfLocalCache";
@@ -6,6 +6,8 @@ import { peekPdfDataUrlFromSession, peekPdfBlobUrlFromSession } from "../pdfSess
 import { peekPdfHandoff } from "../pdfHandoff";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
+import { clearStoredCheckoutReturnUrl, getStoredCheckoutReturnUrl } from "../checkoutReturn";
+import { buildShopifyPaymentUrl } from "../shopifyPayUrl";
 import styles from "./Done.module.css";
 
 function ensureShareToken(album) {
@@ -24,6 +26,11 @@ export default function Done() {
   const [pdfHref, setPdfHref] = useState(null);
   /** loading | ready | missing */
   const [pdfStatus, setPdfStatus] = useState("loading");
+  const [checkoutReturnUrl, setCheckoutReturnUrl] = useState(null);
+
+  useEffect(() => {
+    setCheckoutReturnUrl(getStoredCheckoutReturnUrl());
+  }, []);
 
   useLayoutEffect(() => {
     if (!id) return;
@@ -124,6 +131,11 @@ export default function Done() {
       setShareUrl(`${window.location.origin}/view/${album.share_token}`);
   }, [album?.share_token, shareUrl]);
 
+  const shopifyPayUrl = useMemo(
+    () => buildShopifyPaymentUrl(id, album?.share_token, shareUrl || ""),
+    [id, album?.share_token, shareUrl]
+  );
+
   if (!album) return <AlbumLoading />;
 
   return (
@@ -151,6 +163,29 @@ export default function Done() {
               צור והורד PDF
             </Link>
           </div>
+        )}
+
+        {shopifyPayUrl && (
+          <p className={styles.sub} style={{ marginBottom: "0.5rem" }}>
+            סיימתם לעצב? המשיכו לתשלום בחנות כדי להשלים את ההזמנה.
+          </p>
+        )}
+        {shopifyPayUrl && (
+          <a href={shopifyPayUrl} className={styles.payShop} target="_blank" rel="noopener noreferrer">
+            מעבר לתשלום בחנות
+          </a>
+        )}
+
+        {checkoutReturnUrl && (
+          <p className={styles.sub} style={{ marginBottom: "0.75rem" }}>
+            <a
+              href={checkoutReturnUrl}
+              className={styles.checkoutReturn}
+              onClick={() => clearStoredCheckoutReturnUrl()}
+            >
+              חזרה לתשלום בחנות
+            </a>
+          </p>
         )}
 
         {shareUrl && (

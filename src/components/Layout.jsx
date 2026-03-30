@@ -1,4 +1,6 @@
-import { Outlet } from "react-router-dom";
+import { useEffect } from "react";
+import { Outlet, useSearchParams } from "react-router-dom";
+import { tryStoreCheckoutReturnUrl } from "../checkoutReturn";
 import styles from "./Layout.module.css";
 
 const LOGO_SRC = "/לוגו%20ללא%20רקע.png";
@@ -12,6 +14,22 @@ function WhatsAppIcon() {
 }
 
 export default function Layout() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const returnToParam = searchParams.get("return_to");
+
+  useEffect(() => {
+    if (!returnToParam) return;
+    tryStoreCheckoutReturnUrl(returnToParam);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("return_to");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [returnToParam, setSearchParams]);
+
   return (
     <div className={styles.wrapper}>
       <header className={styles.logoBar}>
