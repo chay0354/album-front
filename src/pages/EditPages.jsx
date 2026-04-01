@@ -538,6 +538,121 @@ async function captureVisibleElementToPdfJpeg(el) {
   return out.toDataURL("image/jpeg", 0.93);
 }
 
+/** Mini preview in “כל העמודים” sheet — single spread half-page. */
+function StudioSheetPageThumb({ page, getPhotoUrl, getElementUrl }) {
+  const cfg = page?.page_config || {};
+  const bg =
+    cfg.backgroundColor && /^#[0-9A-Fa-f]{6}$/.test(cfg.backgroundColor) ? cfg.backgroundColor : DEFAULT_PAGE_BG;
+  const photos = [...(page?.album_photos || [])].sort((a, b) => a.photo_order - b.photo_order);
+  const stickers = Array.isArray(cfg.stickers) ? cfg.stickers : [];
+  const texts = loadTextsFromPageConfig(cfg);
+
+  return (
+    <div className={styles.studioSheetPageThumbInner} style={{ backgroundColor: bg }}>
+      {photos.map((p, i) => {
+        const layout = p.layout && typeof p.layout.x === "number" ? p.layout : DEFAULT_LAYOUT(i);
+        const rot = layout.rotation ?? 0;
+        return (
+          <div
+            key={p.id}
+            className={styles.studioSheetThumbPhoto}
+            style={{
+              left: `${layout.x}%`,
+              top: `${layout.y}%`,
+              width: `${layout.w}%`,
+              height: `${layout.h}%`,
+              transform: rot ? `rotate(${rot}deg)` : undefined,
+            }}
+          >
+            <img src={getPhotoUrl(p.storage_path)} alt="" draggable={false} />
+          </div>
+        );
+      })}
+      {stickers.map((s) => {
+        if (!s.path) return null;
+        const x = s.x ?? 10;
+        const y = s.y ?? 10;
+        const w = s.w ?? 12;
+        const h = s.h ?? 12;
+        const rot = s.rotation ?? 0;
+        return (
+          <div
+            key={s.id}
+            className={styles.studioSheetThumbSticker}
+            style={{
+              left: `${x}%`,
+              top: `${y}%`,
+              width: `${w}%`,
+              height: `${h}%`,
+              transform: rot ? `rotate(${rot}deg)` : undefined,
+            }}
+          >
+            <img src={getElementUrl(s.path)} alt="" draggable={false} />
+          </div>
+        );
+      })}
+      {texts.map((t) => (
+        <div
+          key={t.id}
+          className={styles.studioSheetThumbText}
+          style={{
+            left: `${t.x ?? 50}%`,
+            top: `${t.y ?? 25}%`,
+            color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : DEFAULT_TEXT_COLOR,
+            fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
+            fontSize: `${Math.max(5, Math.min(13, (t.fontSize ?? 28) * 0.21))}px`,
+          }}
+        >
+          {(t.content || "").trim().slice(0, 28)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StudioSheetCoverThumb({ album, coverUrl }) {
+  const cfg = album?.cover_config || {};
+  const texts =
+    Array.isArray(cfg.texts) && cfg.texts.length > 0
+      ? cfg.texts
+      : cfg.headerText
+        ? [
+            {
+              content: cfg.headerText,
+              x: typeof cfg.headerX === "number" ? cfg.headerX : 50,
+              y: typeof cfg.headerY === "number" ? cfg.headerY : 18,
+              fontSize: typeof cfg.headerFontSize === "number" ? cfg.headerFontSize : 28,
+              color: "#ffffff",
+              fontFamily: cfg.headerFontFamily || DEFAULT_FONT,
+            },
+          ]
+        : [];
+  const coverStyle = coverUrl
+    ? { backgroundImage: `url("${coverUrl}")`, backgroundSize: "cover", backgroundPosition: "center" }
+    : { background: "#d1d5db" };
+
+  return (
+    <div className={styles.studioSheetCoverThumbInner} style={coverStyle}>
+      <div className={styles.studioSheetCoverThumbOverlay} aria-hidden />
+      {texts.map((t, i) => (
+        <div
+          key={i}
+          className={styles.studioSheetCoverThumbText}
+          style={{
+            left: `${t.x ?? 50}%`,
+            top: `${t.y ?? 18}%`,
+            color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
+            fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
+            fontSize: `${Math.max(5, Math.min(12, (t.fontSize ?? 28) * 0.19))}px`,
+          }}
+        >
+          {(t.content || "").trim().slice(0, 24)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AlbumCover({ album, coverUrl }) {
   const cfg = album?.cover_config || {};
   const texts = Array.isArray(cfg.texts) && cfg.texts.length > 0
@@ -3895,6 +4010,10 @@ export default function EditPages() {
   }
 
   const pages = album?.pages || [];
+  const pagesSortedForSheet = useMemo(() => {
+    const list = album?.pages || [];
+    return [...list].sort((a, b) => (a.page_order ?? 0) - (b.page_order ?? 0));
+  }, [album?.pages]);
   const spreadCount = Math.max(1, Math.ceil(pages.length / 2));
   const viewCount = 1 + spreadCount;
   const currentSpreadIndex = viewIndex === 0 ? 0 : viewIndex - 1;
@@ -4970,28 +5089,51 @@ export default function EditPages() {
               </button>
             </div>
             <div className={styles.studioAllPagesGrid}>
-              <button
-                type="button"
-                className={styles.studioThumb + (viewIndex === 0 ? " " + styles.studioThumbActive : "")}
-                onClick={() => { setViewIndex(0); setShowAllPagesSheet(false); }}
-              >
-                <div style={{ height: "100%", background: "#d1d5db", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem" }}>
-                  כריכה
-                </div>
-              </button>
-              {Array.from({ length: spreadCount }, (_, i) => (
+              <div className={styles.studioThumbCell}>
                 <button
-                  key={i}
                   type="button"
-                  className={styles.studioThumb + (viewIndex === i + 1 ? " " + styles.studioThumbActive : "")}
-                  onClick={() => { setViewIndex(i + 1); setShowAllPagesSheet(false); }}
+                  className={styles.studioThumb + (viewIndex === 0 ? " " + styles.studioThumbActive : "")}
+                  onClick={() => {
+                    setViewIndex(0);
+                    setActivePageId(null);
+                    setStudioPhotoSel(null);
+                    setStudioStickerSel(null);
+                    setStudioTextSel(null);
+                    setStudioEditingTextId(null);
+                    setStudioSpreadFontSizeLive(null);
+                    setShowAllPagesSheet(false);
+                  }}
                 >
-                  <div style={{ height: "100%", background: "#9ca3af", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", color: "#fff" }}>
-                    {i * 2 + 1}
-                    {i * 2 + 2 <= pages.length ? `–${i * 2 + 2}` : ""}
-                  </div>
+                  <StudioSheetCoverThumb album={album} coverUrl={coverUrl} />
                 </button>
-              ))}
+                <span className={styles.studioThumbLabel}>כריכה</span>
+              </div>
+              {pagesSortedForSheet.map((pg, pageIndex) => {
+                const spreadIdx = Math.floor(pageIndex / 2);
+                const isActive = viewIndex === spreadIdx + 1 && activePageId === pg.id;
+                const label = `עמוד ${pageIndex + 1}`;
+                return (
+                  <div key={pg.id} className={styles.studioThumbCell}>
+                    <button
+                      type="button"
+                      className={styles.studioThumb + (isActive ? " " + styles.studioThumbActive : "")}
+                      onClick={() => {
+                        setViewIndex(spreadIdx + 1);
+                        setActivePageId(pg.id);
+                        setStudioPhotoSel(null);
+                        setStudioStickerSel(null);
+                        setStudioTextSel(null);
+                        setStudioEditingTextId(null);
+                        setStudioSpreadFontSizeLive(null);
+                        setShowAllPagesSheet(false);
+                      }}
+                    >
+                      <StudioSheetPageThumb page={pg} getPhotoUrl={getPhotoUrl} getElementUrl={getElementUrl} />
+                    </button>
+                    <span className={styles.studioThumbLabel}>{label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

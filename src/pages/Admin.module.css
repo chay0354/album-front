@@ -31,6 +31,75 @@
   color: var(--accent);
 }
 
+.headerLinks {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.logoutAdminBtn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: var(--text-muted);
+  background: var(--surface2);
+  border: 1px solid var(--surface3);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.logoutAdminBtn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+.adminGate {
+  max-width: 320px;
+  margin: 2rem auto 0;
+  padding: 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--surface2);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.adminGateLabel {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.adminGateInput {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.75rem;
+  font-size: 1rem;
+  font-family: inherit;
+  border: 1px solid var(--surface2);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.adminGateBtn {
+  margin-top: 0.25rem;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.adminGateBtn:hover {
+  background: var(--accent-hover);
+}
+
 .coverSection {
   background: var(--surface);
   border: 1px solid var(--surface2);

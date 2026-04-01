@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import { getPdfDeliveries, getPremadeCoverList, uploadPremadeCover } from "../api";
 import styles from "./Admin.module.css";
 
+const ADMIN_SESSION_KEY = "album_admin_unlocked";
+const ADMIN_PASSWORD = (import.meta.env.VITE_ADMIN_PASSWORD || "system0386").trim();
+
 const LOGO_WATERMARK_SRC = "/לוגו%20ללא%20רקע.png";
 /** Full-cover watermark: one big logo over the whole cover, low opacity to deter screenshots */
 const WATERMARK_OPACITY = 0.14;
@@ -64,6 +67,9 @@ async function addWatermarkToCover(file) {
 }
 
 export default function Admin() {
+  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem(ADMIN_SESSION_KEY) === "1");
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(null);
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -72,18 +78,45 @@ export default function Admin() {
   const [coverError, setCoverError] = useState(null);
   const coverInputRef = useRef(null);
 
+  function handlePasswordSubmit(e) {
+    e.preventDefault();
+    setPasswordError(null);
+    if (passwordInput.trim() === ADMIN_PASSWORD) {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
+      setUnlocked(true);
+      setPasswordInput("");
+    } else {
+      setPasswordError("סיסמה שגויה.");
+    }
+  }
+
+  function handleLogoutAdmin() {
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    setUnlocked(false);
+    setList([]);
+    setPremadeCovers([]);
+    setError(null);
+    setLoading(true);
+  }
+
   useEffect(() => {
+    if (!unlocked) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     getPdfDeliveries()
       .then((data) => setList(data))
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [unlocked]);
 
   useEffect(() => {
+    if (!unlocked) return;
     getPremadeCoverList()
       .then((data) => setPremadeCovers(Array.isArray(data) ? data : []))
       .catch(() => setPremadeCovers([]));
-  }, []);
+  }, [unlocked]);
 
   async function handleCoverUpload(e) {
     const file = e.target.files?.[0];
@@ -116,6 +149,35 @@ export default function Admin() {
 
   const entries = Object.entries(byEmail).sort((a, b) => a[0].localeCompare(b[0]));
 
+  if (!unlocked) {
+    return (
+      <div className={styles.page}>
+        <header className={styles.header}>
+          <h1>ניהול</h1>
+          <p className={styles.sub}>הזינו סיסמה כדי להמשיך</p>
+          <Link to="/" className={styles.backLink}>← חזרה לדף הבית</Link>
+        </header>
+        <form className={styles.adminGate} onSubmit={handlePasswordSubmit}>
+          <label className={styles.adminGateLabel} htmlFor="admin-password">
+            סיסמה
+          </label>
+          <input
+            id="admin-password"
+            type="password"
+            autoComplete="current-password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            className={styles.adminGateInput}
+          />
+          {passwordError && <p className={styles.error}>{passwordError}</p>}
+          <button type="submit" className={styles.adminGateBtn}>
+            כניסה
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -132,7 +194,12 @@ export default function Admin() {
       <header className={styles.header}>
         <h1>ניהול – משתמשים ו־PDF</h1>
         <p className={styles.sub}>כל משתמש (אימייל) והקבצים שיצר</p>
-        <Link to="/" className={styles.backLink}>← חזרה לדף הבית</Link>
+        <div className={styles.headerLinks}>
+          <Link to="/" className={styles.backLink}>← חזרה לדף הבית</Link>
+          <button type="button" className={styles.logoutAdminBtn} onClick={handleLogoutAdmin}>
+            יציאה מניהול
+          </button>
+        </div>
       </header>
 
       {error && <p className={styles.error}>{error}</p>}
