@@ -25,8 +25,8 @@ import { stashPdfDataUrlForSession, stashPdfBlobUrlForSession } from "../pdfSess
 import { stashPdfHandoff } from "../pdfHandoff";
 import { getMyglobyCheckoutUrl } from "../myglobyCheckout";
 import {
-  navigatePendingPaymentTabTo,
-  cancelPendingPaymentTab,
+  finishPaymentTabNavigation,
+  abortPaymentFlowAfterPdfFailure,
 } from "../paymentTabBridge";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
@@ -3925,11 +3925,11 @@ export default function EditPages() {
       flushSync(() => {
         setGeneratingPdf(false);
       });
-      const payNavigated = navigatePendingPaymentTabTo(cartUrl);
+      const payNavigated = finishPaymentTabNavigation(cartUrl);
       setPostPdfPayFallbackUrl(payNavigated ? null : cartUrl);
       setPostPdfThanksVisible(true);
     } catch (e) {
-      cancelPendingPaymentTab();
+      abortPaymentFlowAfterPdfFailure();
       setError(e.message || "שגיאה ביצירת PDF");
     } finally {
       document.body.classList.remove("pdfCaptureMode");

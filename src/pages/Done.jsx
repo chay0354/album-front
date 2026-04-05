@@ -8,7 +8,7 @@ import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { clearStoredCheckoutReturnUrl, getStoredCheckoutReturnUrl } from "../checkoutReturn";
 import { getMyglobyCheckoutUrl } from "../myglobyCheckout";
-import { openBlankPaymentTabFromUserGesture } from "../paymentTabBridge";
+import { openPaymentTabOnUserClick } from "../paymentTabBridge";
 import styles from "./Done.module.css";
 
 function ensureShareToken(album) {
@@ -164,7 +164,7 @@ export default function Done() {
               to={`/album/${id}/pages`}
               state={{ autoGeneratePdf: true }}
               className={styles.cta}
-              onClick={() => openBlankPaymentTabFromUserGesture()}
+              onClick={() => openPaymentTabOnUserClick(getMyglobyCheckoutUrl(album?.pages?.length ?? 0))}
             >
               צור והורד PDF
             </Link>
