@@ -5,6 +5,7 @@ import { getAlbum, getBaseCovers, getPhotoUrl, getCoverUrl, getElementUrl } from
 import { getFontStack } from "../constants/fonts";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
+import { openBlankPaymentTabFromUserGesture } from "../paymentTabBridge";
 import styles from "./Preview.module.css";
 
 const DEFAULT_LAYOUT = (index) => {
@@ -517,7 +518,10 @@ export default function Preview() {
         </button>
         <button
           type="button"
-          onClick={() => navigate(`/album/${id}/pages`, { state: { openPdfFinish: true } })}
+          onClick={() => {
+            openBlankPaymentTabFromUserGesture();
+            navigate(`/album/${id}/pages`, { state: { openPdfFinish: true } });
+          }}
           className={styles.cta}
         >
           המשך לתשלום

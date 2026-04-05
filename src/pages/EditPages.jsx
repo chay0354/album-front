@@ -24,6 +24,10 @@ import { saveLocalPdfBlob } from "../pdfLocalCache";
 import { stashPdfDataUrlForSession, stashPdfBlobUrlForSession } from "../pdfSessionBridge";
 import { stashPdfHandoff } from "../pdfHandoff";
 import { getMyglobyCheckoutUrl } from "../myglobyCheckout";
+import {
+  navigatePendingPaymentTabTo,
+  cancelPendingPaymentTab,
+} from "../paymentTabBridge";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
@@ -3787,6 +3791,8 @@ export default function EditPages() {
   const [editingPage, setEditingPage] = useState(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [postPdfThanksVisible, setPostPdfThanksVisible] = useState(false);
+  /** If blank-tab payment failed, show one link (user gesture) — Chrome popup rules. */
+  const [postPdfPayFallbackUrl, setPostPdfPayFallbackUrl] = useState(null);
   const [activePageId, setActivePageId] = useState(null);
   const [studioPhotoSel, setStudioPhotoSel] = useState(null);
   const [studioStickerSel, setStudioStickerSel] = useState(null);
@@ -3836,6 +3842,7 @@ export default function EditPages() {
     autoPdfNavKeyRef.current = null;
     pdfFinishRunLockRef.current = false;
     setPostPdfThanksVisible(false);
+    setPostPdfPayFallbackUrl(null);
   }, [id]);
 
   useEffect(() => {
@@ -3847,6 +3854,7 @@ export default function EditPages() {
     pdfFinishRunLockRef.current = true;
     setGeneratingPdf(true);
     setPostPdfThanksVisible(false);
+    setPostPdfPayFallbackUrl(null);
     setError(null);
 
     const pagesSorted = [...(album?.pages || [])].sort((a, b) => (a.page_order ?? 0) - (b.page_order ?? 0));
@@ -3917,10 +3925,11 @@ export default function EditPages() {
       flushSync(() => {
         setGeneratingPdf(false);
       });
-      /* Payment opens only here — after PDF is saved (not from Preview). Popup blockers may block this. */
-      window.open(cartUrl, "_blank", "noopener,noreferrer");
+      const payNavigated = navigatePendingPaymentTabTo(cartUrl);
+      setPostPdfPayFallbackUrl(payNavigated ? null : cartUrl);
       setPostPdfThanksVisible(true);
     } catch (e) {
+      cancelPendingPaymentTab();
       setError(e.message || "שגיאה ביצירת PDF");
     } finally {
       document.body.classList.remove("pdfCaptureMode");
@@ -4675,11 +4684,36 @@ export default function EditPages() {
         <div
           className={styles.editorUploadBusyOverlay}
           role="presentation"
-          onClick={() => setPostPdfThanksVisible(false)}
+          onClick={() => {
+            setPostPdfThanksVisible(false);
+            setPostPdfPayFallbackUrl(null);
+          }}
         >
-          <div className={styles.editorUploadBusyCard} role="status" aria-live="polite">
+          <div
+            className={styles.editorUploadBusyCard}
+            role="status"
+            aria-live="polite"
+            onClick={(e) => e.stopPropagation()}
+          >
             <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 600 }}>תודה!</p>
             <p style={{ margin: "0.75rem 0 0", fontSize: "1rem", opacity: 0.95 }}>ניתן לסגור את חלון זה</p>
+            {postPdfPayFallbackUrl && (
+              <a
+                href={postPdfPayFallbackUrl}
+                className={styles.studioTopBtn}
+                style={{
+                  marginTop: "1rem",
+                  textDecoration: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                פתיחת תשלום
+              </a>
+            )}
           </div>
         </div>
       )}

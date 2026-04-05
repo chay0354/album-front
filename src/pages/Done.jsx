@@ -8,6 +8,7 @@ import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { clearStoredCheckoutReturnUrl, getStoredCheckoutReturnUrl } from "../checkoutReturn";
 import { getMyglobyCheckoutUrl } from "../myglobyCheckout";
+import { openBlankPaymentTabFromUserGesture } from "../paymentTabBridge";
 import styles from "./Done.module.css";
 
 function ensureShareToken(album) {
@@ -159,7 +160,12 @@ export default function Done() {
             <p style={{ marginBottom: "0.75rem" }}>
               לא נמצא PDF במכשיר. לחצו למטה — ייפתח הסטודיו, יווצר ה־PDF אוטומטית ותועברו חזרה להורדה. (לחלופין: בתפריט (⋮) בחרו &quot;סיום והורדת PDF&quot;.)
             </p>
-            <Link to={`/album/${id}/pages`} state={{ autoGeneratePdf: true }} className={styles.cta}>
+            <Link
+              to={`/album/${id}/pages`}
+              state={{ autoGeneratePdf: true }}
+              className={styles.cta}
+              onClick={() => openBlankPaymentTabFromUserGesture()}
+            >
               צור והורד PDF
             </Link>
           </div>
