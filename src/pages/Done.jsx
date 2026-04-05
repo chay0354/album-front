@@ -7,7 +7,7 @@ import { peekPdfHandoff } from "../pdfHandoff";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { clearStoredCheckoutReturnUrl, getStoredCheckoutReturnUrl } from "../checkoutReturn";
-import { buildShopifyPaymentUrl } from "../shopifyPayUrl";
+import { getMyglobyCheckoutUrl } from "../myglobyCheckout";
 import styles from "./Done.module.css";
 
 function ensureShareToken(album) {
@@ -131,9 +131,9 @@ export default function Done() {
       setShareUrl(`${window.location.origin}/view/${album.share_token}`);
   }, [album?.share_token, shareUrl]);
 
-  const shopifyPayUrl = useMemo(
-    () => buildShopifyPaymentUrl(id, album?.share_token, shareUrl || ""),
-    [id, album?.share_token, shareUrl]
+  const myglobyCartUrl = useMemo(
+    () => getMyglobyCheckoutUrl(album?.pages?.length ?? 0),
+    [album?.pages?.length]
   );
 
   if (!album) return <AlbumLoading />;
@@ -165,14 +165,14 @@ export default function Done() {
           </div>
         )}
 
-        {shopifyPayUrl && (
+        {myglobyCartUrl && (
           <p className={styles.sub} style={{ marginBottom: "0.5rem" }}>
-            סיימתם לעצב? המשיכו לתשלום בחנות כדי להשלים את ההזמנה.
+            סיימתם לעצב? המשיכו לעגלה ב־MyGloby כדי להשלים את ההזמנה (לפי מספר העמודים שבחרתם).
           </p>
         )}
-        {shopifyPayUrl && (
-          <a href={shopifyPayUrl} className={styles.payShop} target="_blank" rel="noopener noreferrer">
-            מעבר לתשלום בחנות
+        {myglobyCartUrl && (
+          <a href={myglobyCartUrl} className={styles.payShop}>
+            מעבר לעגלה
           </a>
         )}
 

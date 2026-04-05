@@ -13,7 +13,13 @@ export function buildPdfBlobFromJpegDataUrls(jpegDataUrls) {
   const h = pdf.internal.pageSize.getHeight();
   jpegDataUrls.forEach((dataUrl, i) => {
     if (i > 0) pdf.addPage();
-    pdf.addImage(dataUrl, "JPEG", 0, 0, w, h, undefined, "MEDIUM");
+    try {
+      if (dataUrl && String(dataUrl).startsWith("data:image/")) {
+        pdf.addImage(dataUrl, "JPEG", 0, 0, w, h, undefined, "MEDIUM");
+      }
+    } catch (_) {
+      /* Invalid raster — keep this PDF sheet blank so page count matches album. */
+    }
   });
   return pdf.output("blob");
 }

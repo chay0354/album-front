@@ -14,6 +14,7 @@ import {
   updatePageConfig,
   getElementsList,
   getElementUrl,
+  generatePdfFromImages,
 } from "../api";
 import html2canvas from "html2canvas";
 import { toJpeg } from "html-to-image";
@@ -22,6 +23,7 @@ import { buildPdfBlobFromJpegDataUrls } from "../pdfClient";
 import { saveLocalPdfBlob } from "../pdfLocalCache";
 import { stashPdfDataUrlForSession, stashPdfBlobUrlForSession } from "../pdfSessionBridge";
 import { stashPdfHandoff } from "../pdfHandoff";
+import { getMyglobyCheckoutUrl } from "../myglobyCheckout";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { FONT_OPTIONS, DEFAULT_FONT, getFontStack } from "../constants/fonts";
@@ -513,9 +515,13 @@ async function captureVisibleElementToPdfJpeg(el) {
   }
 
   const img = new Image();
-  await new Promise((resolve, reject) => {
-    img.onload = resolve;
-    img.onerror = () => reject(new Error("PDF capture: image decode failed"));
+  let decodeOk = true;
+  await new Promise((resolve) => {
+    img.onload = () => resolve();
+    img.onerror = () => {
+      decodeOk = false;
+      resolve();
+    };
     img.src = dataUrl;
   });
 
@@ -528,7 +534,8 @@ async function captureVisibleElementToPdfJpeg(el) {
   ctx.fillRect(0, 0, PDF_OUT_W, PDF_OUT_H);
   const nw = img.naturalWidth;
   const nh = img.naturalHeight;
-  if (nw < 1 || nh < 1) throw new Error("PDF capture: empty snapshot");
+  /* Blank / empty regions may decode to 0×0 — still emit a white PDF page so page count matches. */
+  if (!decodeOk || nw < 1 || nh < 1) return out.toDataURL("image/jpeg", 0.93);
   const scale = Math.min(PDF_OUT_W / nw, PDF_OUT_H / nh);
   const dw = nw * scale;
   const dh = nh * scale;
@@ -3887,17 +3894,14 @@ export default function EditPages() {
       }
 
       const blob = buildPdfBlobFromJpegDataUrls(images);
+      await generatePdfFromImages(id, images);
       await saveLocalPdfBlob(id, blob).catch(() => {});
       await stashPdfDataUrlForSession(id, blob);
       const pdfBlobUrl = URL.createObjectURL(blob);
       stashPdfHandoff(id, pdfBlobUrl);
       stashPdfBlobUrlForSession(id, pdfBlobUrl);
-      const a = document.createElement("a");
-      a.href = pdfBlobUrl;
-      a.download = "album.pdf";
-      a.click();
-      /* Keep blob URL alive for Done page (iPhone often has no usable IDB/data-URL handoff). */
-      navigate(`/album/${id}/done`, { state: { pdfBlobUrl } });
+      const pageCount = pagesSorted.length;
+      window.location.assign(getMyglobyCheckoutUrl(pageCount));
     } catch (e) {
       setError(e.message || "שגיאה ביצירת PDF");
     } finally {

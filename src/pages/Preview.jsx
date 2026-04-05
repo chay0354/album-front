@@ -520,7 +520,7 @@ export default function Preview() {
           onClick={() => navigate(`/album/${id}/pages`, { state: { openPdfFinish: true } })}
           className={styles.cta}
         >
-          המשך ליצירת PDF
+          המשך לתשלום
         </button>
       </div>
 
