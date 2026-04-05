@@ -3925,7 +3925,7 @@ export default function EditPages() {
       flushSync(() => {
         setGeneratingPdf(false);
       });
-      const payNavigated = finishPaymentTabNavigation(cartUrl);
+      const payNavigated = finishPaymentTabNavigation();
       setPostPdfPayFallbackUrl(payNavigated ? null : cartUrl);
       setPostPdfThanksVisible(true);
     } catch (e) {
@@ -4674,7 +4674,7 @@ export default function EditPages() {
             <span className={styles.editorUploadSpinner} aria-hidden />
             <span>שומרים ומסיימים…</span>
             <span style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: "0.35rem", textAlign: "center" }}>
-              בסיום יוצג אישור.
+              נשמר כאן ה־PDF; אם נפתחה לשונית תשלום — אפשר להמשיך שם. בסיום יוצג אישור.
             </span>
           </div>
         </div>
