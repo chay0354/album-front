@@ -3778,12 +3778,15 @@ export default function EditPages() {
   const location = useLocation();
   const autoPdfNavKeyRef = useRef(null);
   const finishPdfRef = useRef(null);
+  /** Prevents duplicate PDF runs (e.g. React Strict Mode) from opening checkout twice. */
+  const pdfFinishRunLockRef = useRef(false);
   const [album, setAlbum] = useState(null);
   const [viewIndex, setViewIndex] = useState(1);
   const [coverImageUrl, setCoverImageUrl] = useState(null);
   const [error, setError] = useState(null);
   const [editingPage, setEditingPage] = useState(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [postPdfThanksVisible, setPostPdfThanksVisible] = useState(false);
   const [activePageId, setActivePageId] = useState(null);
   const [studioPhotoSel, setStudioPhotoSel] = useState(null);
   const [studioStickerSel, setStudioStickerSel] = useState(null);
@@ -3831,6 +3834,8 @@ export default function EditPages() {
 
   useEffect(() => {
     autoPdfNavKeyRef.current = null;
+    pdfFinishRunLockRef.current = false;
+    setPostPdfThanksVisible(false);
   }, [id]);
 
   useEffect(() => {
@@ -3838,10 +3843,15 @@ export default function EditPages() {
   }, []);
 
   async function handleFinishAndDownload() {
+    if (pdfFinishRunLockRef.current) return;
+    pdfFinishRunLockRef.current = true;
     setGeneratingPdf(true);
+    setPostPdfThanksVisible(false);
     setError(null);
 
     const pagesSorted = [...(album?.pages || [])].sort((a, b) => (a.page_order ?? 0) - (b.page_order ?? 0));
+    const cartUrl = getMyglobyCheckoutUrl(pagesSorted.length);
+
     const captureSteps = [{ kind: "cover" }];
     /* Every album page = one PDF half-page, even if empty (background / stickers / placeholders). */
     pagesSorted.forEach((_, pageIndex) => {
@@ -3881,8 +3891,7 @@ export default function EditPages() {
         }
 
         await document.fonts.ready;
-        await new Promise((r) => setTimeout(r, 150));
-        await new Promise((r) => requestAnimationFrame(r));
+        await new Promise((r) => setTimeout(r, 60));
         await new Promise((r) => requestAnimationFrame(r));
 
         const selector =
@@ -3900,8 +3909,17 @@ export default function EditPages() {
       const pdfBlobUrl = URL.createObjectURL(blob);
       stashPdfHandoff(id, pdfBlobUrl);
       stashPdfBlobUrlForSession(id, pdfBlobUrl);
-      const pageCount = pagesSorted.length;
-      window.location.assign(getMyglobyCheckoutUrl(pageCount));
+      try {
+        sessionStorage.removeItem("albumCheckoutTabForPdf");
+      } catch (_) {
+        /* ignore */
+      }
+      flushSync(() => {
+        setGeneratingPdf(false);
+      });
+      /* Payment opens only here — after PDF is saved (not from Preview). Popup blockers may block this. */
+      window.open(cartUrl, "_blank", "noopener,noreferrer");
+      setPostPdfThanksVisible(true);
     } catch (e) {
       setError(e.message || "שגיאה ביצירת PDF");
     } finally {
@@ -3915,6 +3933,7 @@ export default function EditPages() {
         setStudioEditingTextId(saved.studioEditingTextId);
       });
       setGeneratingPdf(false);
+      pdfFinishRunLockRef.current = false;
     }
   }
 
@@ -4636,6 +4655,31 @@ export default function EditPages() {
           <div className={styles.editorUploadBusyCard}>
             <span className={styles.editorUploadSpinner} aria-hidden />
             <span>מעלה תמונות…</span>
+          </div>
+        </div>
+      )}
+
+      {generatingPdf && (
+        <div className={styles.editorUploadBusyOverlay} role="status" aria-live="polite" aria-busy="true">
+          <div className={styles.editorUploadBusyCard}>
+            <span className={styles.editorUploadSpinner} aria-hidden />
+            <span>שומרים ומסיימים…</span>
+            <span style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: "0.35rem", textAlign: "center" }}>
+              בסיום יוצג אישור.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {postPdfThanksVisible && (
+        <div
+          className={styles.editorUploadBusyOverlay}
+          role="presentation"
+          onClick={() => setPostPdfThanksVisible(false)}
+        >
+          <div className={styles.editorUploadBusyCard} role="status" aria-live="polite">
+            <p style={{ margin: 0, fontSize: "1.25rem", fontWeight: 600 }}>תודה!</p>
+            <p style={{ margin: "0.75rem 0 0", fontSize: "1rem", opacity: 0.95 }}>ניתן לסגור את חלון זה</p>
           </div>
         </div>
       )}
