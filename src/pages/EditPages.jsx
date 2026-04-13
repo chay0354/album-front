@@ -4292,9 +4292,14 @@ export default function EditPages() {
       try {
         setHistoryBusy(true);
         await persistPageUndoState(pageId, page_config, photoLayouts);
-        await refreshAlbum();
       } catch (e) {
         setError(e?.message || "שגיאה בשמירת היסטוריה");
+        // If server sync fails, refresh once to recover to canonical state.
+        try {
+          await refreshAlbum();
+        } catch {
+          /* keep current optimistic state if refresh also fails */
+        }
       } finally {
         setHistoryBusy(false);
       }
