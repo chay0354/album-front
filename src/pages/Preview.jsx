@@ -22,14 +22,57 @@ export const BOOK_HEIGHT_DESKTOP = 481; /* A4 per half: (680/2) * (297/210) */
 const EDITOR_PAGE_WIDTH = 420;
 const VIEWER_HALF_WIDTH = BOOK_WIDTH_DESKTOP / 2;
 const VIEWER_TEXT_SCALE = VIEWER_HALF_WIDTH / EDITOR_PAGE_WIDTH;
+const COVER_FRONT_START = 0;
+const COVER_FRONT_END = 48;
+const COVER_BACK_START = 52;
+const COVER_BACK_END = 100;
 
-export const CoverPage = forwardRef(function CoverPage({ album, coverUrl }, ref) {
-  const cfg = album?.cover_config || {};
-  const texts = Array.isArray(cfg.texts) && cfg.texts.length > 0
+function getCoverTexts(cfg) {
+  return Array.isArray(cfg.texts) && cfg.texts.length > 0
     ? cfg.texts
     : cfg.headerText
       ? [{ content: cfg.headerText, x: cfg.headerX ?? 50, y: cfg.headerY ?? 18, fontSize: cfg.headerFontSize ?? 28, color: "#ffffff" }]
       : [];
+}
+
+function projectTextToCoverSide(text, sideStart, sideEnd) {
+  const span = sideEnd - sideStart;
+  if (span <= 0) return null;
+  const parsed = Number(text?.x);
+  const x = Number.isFinite(parsed) ? parsed : 50;
+  if (x < sideStart || x > sideEnd) return null;
+  const sideX = ((x - sideStart) / span) * 100;
+  return { ...text, x: Math.max(0, Math.min(100, sideX)) };
+}
+
+function normalizeCoverTextForSide(text, side) {
+  const sideStart = side === "back" ? COVER_BACK_START : COVER_FRONT_START;
+  const sideEnd = side === "back" ? COVER_BACK_END : COVER_FRONT_END;
+  const rawSide = typeof text?.side === "string" ? text.side.toLowerCase() : "";
+  const explicitSide = rawSide === "back" ? "back" : rawSide === "front" ? "front" : null;
+  const parsed = Number(text?.x);
+  const x = Number.isFinite(parsed) ? parsed : 50;
+  const inferredSide = x >= COVER_BACK_START ? "back" : x <= COVER_FRONT_END ? "front" : "front";
+  const effectiveSide = explicitSide || inferredSide;
+
+  if (effectiveSide !== side) return null;
+
+  const ranged = projectTextToCoverSide(text, sideStart, sideEnd);
+  if (ranged) return ranged;
+
+  // Support local-per-side saved coords (0..100) for older payloads.
+  if (Number.isFinite(x) && x >= 0 && x <= 100) {
+    return { ...text, x };
+  }
+
+  return null;
+}
+
+export const CoverPage = forwardRef(function CoverPage({ album, coverUrl }, ref) {
+  const cfg = album?.cover_config || {};
+  const texts = getCoverTexts(cfg)
+    .map((t) => normalizeCoverTextForSide(t, "front"))
+    .filter(Boolean);
   const coverStyle = coverUrl
     ? { backgroundImage: `url("${coverUrl}")` }
     : { background: "#333" };
@@ -60,13 +103,37 @@ export const CoverPage = forwardRef(function CoverPage({ album, coverUrl }, ref)
   );
 });
 
-export const BackCoverPage = forwardRef(function BackCoverPage({ coverUrl }, ref) {
+export const BackCoverPage = forwardRef(function BackCoverPage({ album, coverUrl }, ref) {
+  const cfg = album?.cover_config || {};
+  const texts = getCoverTexts(cfg)
+    .map((t) => normalizeCoverTextForSide(t, "back"))
+    .filter(Boolean);
   const coverStyle = coverUrl
     ? { backgroundImage: `url("${coverUrl}")`, backgroundPosition: "right center" }
     : { background: "#333" };
   return (
     <div ref={ref} className={styles.flipPage + " " + styles.coverPage + " " + styles.backCoverPage}>
-      <div className={styles.flipPageCover + " " + styles.flipPageCoverBack + " " + styles.coverClipLeft} style={coverStyle} />
+      <div className={styles.flipPageCover + " " + styles.flipPageCoverBack + " " + styles.coverClipLeft} style={coverStyle}>
+        {texts.map((t, i) => {
+          const designSize = t.fontSize ?? 28;
+          const viewerSize = Math.max(12, Math.round(designSize * VIEWER_TEXT_SCALE));
+          return (
+            <div
+              key={i}
+              className={styles.flipPageCoverText}
+              style={{
+                left: `${t.x ?? 50}%`,
+                top: `${t.y ?? 18}%`,
+                fontSize: `${viewerSize}px`,
+                color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
+                fontFamily: getFontStack(t.fontFamily),
+              }}
+            >
+              {t.content}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 });
@@ -74,20 +141,16 @@ export const BackCoverPage = forwardRef(function BackCoverPage({ coverUrl }, ref
 /** Standalone cover image (not in the flip book) – full height, no library cropping */
 export function StandaloneCover({ album, coverUrl }) {
   const cfg = album?.cover_config || {};
-  const texts = Array.isArray(cfg.texts) && cfg.texts.length > 0
-    ? cfg.texts
-    : cfg.headerText
-      ? [{ content: cfg.headerText, x: cfg.headerX ?? 50, y: cfg.headerY ?? 18, fontSize: cfg.headerFontSize ?? 28, color: "#ffffff" }]
-      : [];
+  const texts = getCoverTexts(cfg)
+    .map((t) => normalizeCoverTextForSide(t, "front"))
+    .filter(Boolean);
   const coverStyle = coverUrl
     ? { backgroundImage: `url("${coverUrl}")` }
     : { background: "#333" };
   return (
     <div className={styles.standaloneCover}>
-      <div className={styles.standaloneCoverImg + " " + styles.coverClipRight} style={coverStyle} />
+      <div className={styles.standaloneCoverImg + " " + styles.standaloneCoverImgFront} style={coverStyle} />
       {texts.map((t, i) => {
-        const designSize = t.fontSize ?? 28;
-        const viewerSize = Math.max(12, Math.round(designSize * VIEWER_TEXT_SCALE));
         return (
           <div
             key={i}
@@ -95,7 +158,7 @@ export function StandaloneCover({ album, coverUrl }) {
             style={{
               left: `${t.x ?? 50}%`,
               top: `${t.y ?? 18}%`,
-              fontSize: `${viewerSize}px`,
+              fontSize: `${t.fontSize ?? 28}px`,
               color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
               fontFamily: getFontStack(t.fontFamily),
             }}
@@ -109,13 +172,34 @@ export function StandaloneCover({ album, coverUrl }) {
 }
 
 /** Standalone back cover (not in the flip book) – same frame as front, right 48% of image */
-export function StandaloneBackCover({ coverUrl }) {
+export function StandaloneBackCover({ album, coverUrl }) {
+  const cfg = album?.cover_config || {};
+  const texts = getCoverTexts(cfg)
+    .map((t) => normalizeCoverTextForSide(t, "back"))
+    .filter(Boolean);
   const coverStyle = coverUrl
     ? { backgroundImage: `url("${coverUrl}")` }
     : { background: "#333" };
   return (
     <div className={styles.standaloneCover}>
-      <div className={styles.standaloneCoverImg + " " + styles.standaloneCoverImgBack + " " + styles.coverClipLeft} style={coverStyle} />
+      <div className={styles.standaloneCoverImg + " " + styles.standaloneCoverImgBack} style={coverStyle} />
+      {texts.map((t, i) => {
+        return (
+          <div
+            key={i}
+            className={styles.flipPageCoverText}
+            style={{
+              left: `${t.x ?? 50}%`,
+              top: `${t.y ?? 18}%`,
+              fontSize: `${t.fontSize ?? 28}px`,
+              color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
+              fontFamily: getFontStack(t.fontFamily),
+            }}
+          >
+            {t.content}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -432,13 +516,13 @@ export default function Preview() {
           ) : isStandaloneBack ? (
             <div
               key="standalone-back"
-              className={styles.standaloneCoverWrap + " " + styles.standaloneCoverWrapBack}
+              className={styles.standaloneCoverWrap}
               style={{
                 transform: `scale(${bookScale})`,
                 transformOrigin: "top center",
               }}
             >
-              <StandaloneBackCover coverUrl={coverUrl} />
+              <StandaloneBackCover album={album} coverUrl={coverUrl} />
             </div>
           ) : (
             <div

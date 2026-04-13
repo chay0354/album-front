@@ -474,6 +474,106 @@ function setMinimalDragImage(e) {
 const PDF_OUT_W = 1190;
 const PDF_OUT_H = 1684;
 
+function parseCoverTexts(cfg) {
+  if (Array.isArray(cfg?.texts) && cfg.texts.length > 0) return cfg.texts;
+  if (cfg?.headerText) {
+    return [
+      {
+        content: cfg.headerText,
+        x: cfg.headerX ?? 50,
+        y: cfg.headerY ?? 18,
+        fontSize: cfg.headerFontSize ?? 28,
+        color: "#ffffff",
+        fontFamily: cfg.headerFontFamily || DEFAULT_FONT,
+      },
+    ];
+  }
+  return [];
+}
+
+async function captureCoverToPdfJpeg(coverUrl, coverConfig, coverEl) {
+  const rect = coverEl?.getBoundingClientRect();
+  const cssW = Math.max(1, Math.round(rect?.width || 700));
+  const cssH = Math.max(1, Math.round(rect?.height || 500));
+  const pixelRatio = Math.min(4, Math.max(2, Math.ceil(1800 / cssW)));
+  const stageW = Math.max(1, Math.round(cssW * pixelRatio));
+  const stageH = Math.max(1, Math.round(cssH * pixelRatio));
+
+  const stage = document.createElement("canvas");
+  stage.width = stageW;
+  stage.height = stageH;
+  const sctx = stage.getContext("2d");
+  if (!sctx) throw new Error("PDF cover capture: no stage context");
+  sctx.fillStyle = "#ffffff";
+  sctx.fillRect(0, 0, stageW, stageH);
+
+  let imgBounds = { x: 0, y: 0, w: stageW, h: stageH };
+  if (coverUrl) {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    const loaded = await new Promise((resolve) => {
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = coverUrl;
+    });
+    if (loaded && img.naturalWidth > 0 && img.naturalHeight > 0) {
+      const scale = Math.min(stageW / img.naturalWidth, stageH / img.naturalHeight);
+      const dw = img.naturalWidth * scale;
+      const dh = img.naturalHeight * scale;
+      const dx = (stageW - dw) / 2;
+      const dy = (stageH - dh) / 2;
+      sctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, dx, dy, dw, dh);
+      imgBounds = { x: dx, y: dy, w: dw, h: dh };
+    }
+  }
+
+  const texts = parseCoverTexts(coverConfig || {});
+  texts.forEach((t) => {
+    const content = String(t?.content || "").trim();
+    if (!content) return;
+    const xNum = Number(t?.x);
+    const yNum = Number(t?.y);
+    const xPct = Number.isFinite(xNum) ? xNum : 50;
+    const yPct = Number.isFinite(yNum) ? yNum : 18;
+    const fontNum = Number(t?.fontSize);
+    const fontSizeCss = Math.max(10, Number.isFinite(fontNum) ? fontNum : 28);
+    const fill = /^#[0-9A-Fa-f]{6}$/.test(t?.color || "") ? t.color : "#ffffff";
+    const fontFamily = getFontStack(t?.fontFamily || DEFAULT_FONT);
+    const x = (xPct / 100) * stageW;
+    const y = (yPct / 100) * stageH;
+    sctx.textAlign = "center";
+    sctx.font = `${fontSizeCss * pixelRatio}px ${fontFamily}`;
+    const m = sctx.measureText(content);
+    const ascent = m.actualBoundingBoxAscent || fontSizeCss * pixelRatio * 0.8;
+    const descent = m.actualBoundingBoxDescent || fontSizeCss * pixelRatio * 0.2;
+    const textH = ascent + descent;
+    // Match CSS `translate(-50%, -50%)` anchoring more accurately.
+    const yTop = y - textH / 2;
+    sctx.textBaseline = "top";
+    sctx.fillStyle = fill;
+    sctx.shadowColor = "rgba(0,0,0,0.35)";
+    sctx.shadowBlur = 2 * pixelRatio;
+    sctx.fillText(content, x, yTop);
+    sctx.shadowBlur = 0;
+  });
+
+  const out = document.createElement("canvas");
+  out.width = PDF_OUT_W;
+  out.height = PDF_OUT_H;
+  const ctx = out.getContext("2d");
+  if (!ctx) throw new Error("PDF capture: no canvas context");
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, PDF_OUT_W, PDF_OUT_H);
+  const scale = Math.min(PDF_OUT_W / stageW, PDF_OUT_H / stageH);
+  const dw = stageW * scale;
+  const dh = stageH * scale;
+  const dx = (PDF_OUT_W - dw) / 2;
+  const dy = (PDF_OUT_H - dh) / 2;
+  ctx.drawImage(stage, 0, 0, stageW, stageH, dx, dy, dw, dh);
+
+  return out.toDataURL("image/jpeg", 0.93);
+}
+
 /** Raster snapshot of the visible page (pixels only — no PDF font encoding). Order: modern-screenshot → html-to-image → html2canvas. */
 async function captureVisibleElementToPdfJpeg(el) {
   if (!el || !(el instanceof HTMLElement)) throw new Error("PDF capture: no element");
@@ -664,7 +764,7 @@ function StudioSheetCoverThumb({ album, coverUrl }) {
   );
 }
 
-function AlbumCover({ album, coverUrl }) {
+function AlbumCover({ album, coverUrl, pdfCaptureMode = false }) {
   const cfg = album?.cover_config || {};
   const texts = Array.isArray(cfg.texts) && cfg.texts.length > 0
     ? cfg.texts
@@ -672,7 +772,15 @@ function AlbumCover({ album, coverUrl }) {
       ? [{ content: cfg.headerText, x: cfg.headerX ?? 50, y: cfg.headerY ?? 18, fontSize: cfg.headerFontSize ?? 28, color: "#ffffff" }]
       : [];
   const coverStyle = coverUrl
-    ? { backgroundImage: `url("${coverUrl}")`, background: `center/cover no-repeat url("${coverUrl}")` }
+    ? pdfCaptureMode
+      ? {
+          backgroundImage: `url("${coverUrl}")`,
+          backgroundPosition: "center center",
+          backgroundSize: "contain",
+          backgroundRepeat: "no-repeat",
+          backgroundColor: "#fff",
+        }
+      : { backgroundImage: `url("${coverUrl}")`, background: `center/cover no-repeat url("${coverUrl}")` }
     : {};
   return (
     <div className={styles.coverSingle} style={coverStyle} data-pdf-capture="cover">
@@ -2796,6 +2904,8 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
   const layoutSyncKey = sorted.map((p) => `${p.id}:${p.photo_order}:${JSON.stringify(p.layout ?? null)}`).join(";");
   const [layouts, setLayouts] = useState({});
   const layoutsRef = useRef(layouts);
+  const isInteractingRef = useRef(false);
+  const pendingServerLayoutsRef = useRef(null);
   const dragRef = useRef({ id: null, startX: 0, startY: 0, startLayout: null, dragStarted: false });
   const resizeRef = useRef({ photoId: null, handle: null, startLayout: null, aspectK: 1 });
   const naturalAspectByPhotoRef = useRef({});
@@ -2815,6 +2925,10 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
           ? { ...DEFAULT_LAYOUT(i), ...p.layout, rotation: p.layout.rotation ?? 0 }
           : DEFAULT_LAYOUT(i);
     });
+    if (isInteractingRef.current) {
+      pendingServerLayoutsRef.current = next;
+      return;
+    }
     setLayouts(next);
   }, [layoutSyncKey]);
 
@@ -2832,8 +2946,10 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
       if (!layout || typeof layout.x !== "number") return;
       onSelectPhoto(photoId);
       setResizingId(photoId);
+      isInteractingRef.current = true;
       const el = containerRef.current;
       if (!el) {
+        isInteractingRef.current = false;
         setResizingId(null);
         return;
       }
@@ -2893,6 +3009,8 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
         setResizingId(null);
         const fid = resizeRef.current.photoId;
         resizeRef.current = { photoId: null, handle: null, startLayout: null, aspectK: 1 };
+        isInteractingRef.current = false;
+        pendingServerLayoutsRef.current = null;
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
         window.removeEventListener("touchmove", onMove);
@@ -2924,6 +3042,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
         startLayout: { ...layout },
         dragStarted: false,
       };
+      isInteractingRef.current = true;
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
@@ -3023,6 +3142,8 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
         dragRef.current = { id: null, startX: 0, startY: 0, startLayout: null, dragStarted: false };
         setDraggingId(null);
         setGuideLines({ vertical: [], horizontal: [] });
+        isInteractingRef.current = false;
+        pendingServerLayoutsRef.current = null;
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
         window.removeEventListener("touchmove", onMove);
@@ -3822,6 +3943,7 @@ export default function EditPages() {
   const studioCropPersistTimerRef = useRef(null);
   const undoConfigStack = useRef([]);
   const redoConfigStack = useRef([]);
+  const historySyncQueueRef = useRef(Promise.resolve());
   const albumLatestRef = useRef(null);
   const studioCropUndoPushedRef = useRef(false);
   const dockScrollRef = useRef(null);
@@ -3906,6 +4028,12 @@ export default function EditPages() {
           step.kind === "cover" ? '[data-pdf-capture="cover"]' : `[data-pdf-capture="${step.side}"]`;
         const el = document.querySelector(selector);
         if (!el) throw new Error("לא נמצא תוכן לצילום PDF");
+
+        if (step.kind === "cover") {
+          const coverRaster = await captureCoverToPdfJpeg(coverUrl, album?.cover_config || {}, el);
+          images.push(coverRaster);
+          continue;
+        }
 
         images.push(await captureVisibleElementToPdfJpeg(el));
       }
@@ -4114,17 +4242,64 @@ export default function EditPages() {
     setRedoDepth(0);
   }
 
-  async function applyPageUndoState(pageId, page_config, photoLayouts) {
+  function applyPageUndoStateLocally(pageId, page_config, photoLayouts) {
+    setAlbum((prev) => {
+      if (!prev?.pages?.length) return prev;
+      const pagesNext = (prev.pages || []).map((p) => {
+        if (p.id !== pageId) return p;
+        const byPhotoId = photoLayouts || {};
+        const albumPhotosNext = (p.album_photos || []).map((ph) => {
+          const nextLayout = byPhotoId[ph.id];
+          if (!nextLayout) return ph;
+          return {
+            ...ph,
+            layout: JSON.parse(JSON.stringify(nextLayout)),
+          };
+        });
+        return {
+          ...p,
+          page_config: JSON.parse(JSON.stringify(page_config || {})),
+          album_photos: albumPhotosNext,
+        };
+      });
+      return { ...prev, pages: pagesNext };
+    });
+  }
+
+  async function persistPageUndoState(pageId, page_config, photoLayouts) {
     const layouts = photoLayouts || {};
-    const fresh = await getAlbum(id);
-    const page = fresh.pages?.find((x) => x.id === pageId);
+    const page = albumLatestRef.current?.pages?.find((x) => x.id === pageId);
     const idsOnPage = new Set((page?.album_photos || []).map((ph) => String(ph.id)));
-    for (const [photoId, layout] of Object.entries(layouts)) {
-      if (!idsOnPage.has(String(photoId))) continue;
-      await updatePhotoLayout(id, photoId, JSON.parse(JSON.stringify(layout)));
+    const layoutEntries = Object.entries(layouts).filter(([photoId]) => idsOnPage.has(String(photoId)));
+
+    // Apply page-level photo layout changes concurrently for a noticeably faster undo/redo.
+    const layoutResults = await Promise.allSettled(
+      layoutEntries.map(([photoId, layout]) => updatePhotoLayout(id, photoId, JSON.parse(JSON.stringify(layout))))
+    );
+
+    const firstLayoutError = layoutResults.find(
+      (res) => res.status === "rejected" && !/404|not found|לא נמצא/i.test(res.reason?.message || "")
+    );
+    if (firstLayoutError && firstLayoutError.status === "rejected") {
+      throw firstLayoutError.reason;
     }
+
     await updatePageConfig(id, pageId, page_config);
-    await refreshAlbum();
+  }
+
+  function queueHistoryPersist(pageId, page_config, photoLayouts) {
+    const runPersist = async () => {
+      try {
+        setHistoryBusy(true);
+        await persistPageUndoState(pageId, page_config, photoLayouts);
+        await refreshAlbum();
+      } catch (e) {
+        setError(e?.message || "שגיאה בשמירת היסטוריה");
+      } finally {
+        setHistoryBusy(false);
+      }
+    };
+    historySyncQueueRef.current = historySyncQueueRef.current.then(runPersist, runPersist);
   }
 
   async function undoLastConfig() {
@@ -4139,20 +4314,12 @@ export default function EditPages() {
       page_config: cur ? JSON.parse(JSON.stringify(cur.page_config || {})) : {},
       photoLayouts: collectPhotoLayoutsSnapshot(cur),
     };
-    try {
-      setHistoryBusy(true);
-      setError(null);
-      await applyPageUndoState(snap.pageId, snap.page_config, snap.photoLayouts);
-      redoConfigStack.current.push(forward);
-      setUndoDepth(undoConfigStack.current.length);
-      setRedoDepth(redoConfigStack.current.length);
-    } catch (e) {
-      undoConfigStack.current.push(snap);
-      setUndoDepth(undoConfigStack.current.length);
-      setError(e.message);
-    } finally {
-      setHistoryBusy(false);
-    }
+    setError(null);
+    applyPageUndoStateLocally(snap.pageId, snap.page_config, snap.photoLayouts);
+    redoConfigStack.current.push(forward);
+    setUndoDepth(undoConfigStack.current.length);
+    setRedoDepth(redoConfigStack.current.length);
+    queueHistoryPersist(snap.pageId, snap.page_config, snap.photoLayouts);
   }
 
   async function redoLastConfig() {
@@ -4167,20 +4334,12 @@ export default function EditPages() {
       page_config: cur ? JSON.parse(JSON.stringify(cur.page_config || {})) : {},
       photoLayouts: collectPhotoLayoutsSnapshot(cur),
     };
-    try {
-      setHistoryBusy(true);
-      setError(null);
-      await applyPageUndoState(snap.pageId, snap.page_config, snap.photoLayouts);
-      undoConfigStack.current.push(back);
-      setUndoDepth(undoConfigStack.current.length);
-      setRedoDepth(redoConfigStack.current.length);
-    } catch (e) {
-      redoConfigStack.current.push(snap);
-      setRedoDepth(redoConfigStack.current.length);
-      setError(e.message);
-    } finally {
-      setHistoryBusy(false);
-    }
+    setError(null);
+    applyPageUndoStateLocally(snap.pageId, snap.page_config, snap.photoLayouts);
+    undoConfigStack.current.push(back);
+    setUndoDepth(undoConfigStack.current.length);
+    setRedoDepth(redoConfigStack.current.length);
+    queueHistoryPersist(snap.pageId, snap.page_config, snap.photoLayouts);
   }
 
   function openStudioPhotoPicker(pageId) {
@@ -4737,7 +4896,7 @@ export default function EditPages() {
         <button
           type="button"
           className={styles.studioTopBtn}
-          disabled={undoDepth === 0 || historyBusy}
+          disabled={undoDepth === 0}
           onClick={() => void undoLastConfig()}
           title="בטל"
         >
@@ -4747,7 +4906,7 @@ export default function EditPages() {
         <button
           type="button"
           className={styles.studioTopBtn}
-          disabled={redoDepth === 0 || historyBusy}
+          disabled={redoDepth === 0}
           onClick={() => void redoLastConfig()}
           title="בצע שוב"
         >
@@ -4873,7 +5032,7 @@ export default function EditPages() {
           )}
           <div className={styles.albumView} style={{ minHeight: viewIndex === 0 ? "auto" : undefined }}>
           {viewIndex === 0 ? (
-            <AlbumCover album={album} coverUrl={coverUrl} />
+            <AlbumCover album={album} coverUrl={coverUrl} pdfCaptureMode={generatingPdf} />
           ) : (
             <AlbumSpread
               leftPage={leftPage}

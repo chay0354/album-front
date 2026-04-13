@@ -54,9 +54,29 @@
   margin-bottom: 2rem;
 }
 
+.coverSplit {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  flex-direction: row-reverse;
+}
+
+.coverPane {
+  width: min(48%, 280px);
+  min-width: 220px;
+}
+
+.coverPaneLabel {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
 .coverFrame {
-  aspect-ratio: 7/5;
-  max-height: 380px;
+  aspect-ratio: 210 / 297;
   margin: 0 auto;
   border-radius: var(--radius);
   background: var(--surface2);
@@ -71,6 +91,16 @@
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+}
+
+.coverClipRight {
+  background-position: left center;
+  background-size: 192% 100%;
+}
+
+.coverClipLeft {
+  background-position: right center;
+  background-size: 208% 100%;
 }
 
 .coverOverlay {
@@ -106,7 +136,7 @@
 }
 
 .textToolbar {
-  margin-bottom: 1rem;
+  margin-bottom: 0.6rem;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -127,6 +157,12 @@
 
 .addTextBtn:hover {
   filter: brightness(1.05);
+}
+
+.coverPaneAddBtn {
+  width: 100%;
+  margin-bottom: 0.45rem;
+  min-height: 44px;
 }
 
 .dragHint {
@@ -484,7 +520,14 @@
     margin-bottom: 1.25rem;
   }
   .coverFrame {
-    max-height: 280px;
+    max-height: 320px;
+  }
+  .coverSplit {
+    gap: 0.55rem;
+  }
+  .coverPane {
+    width: min(48%, 220px);
+    min-width: 160px;
   }
   .textToolbar {
     gap: 0.5rem;

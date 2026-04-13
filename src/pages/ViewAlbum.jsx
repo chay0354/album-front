@@ -202,7 +202,7 @@ export default function ViewAlbum() {
                 transformOrigin: "top center",
               }}
             >
-              <StandaloneBackCover coverUrl={coverUrl} />
+              <StandaloneBackCover album={album} coverUrl={coverUrl} />
             </div>
           ) : (
             <div

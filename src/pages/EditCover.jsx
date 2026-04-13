@@ -12,6 +12,10 @@ const DEFAULT_X = 50;
 const DEFAULT_Y = 18;
 const DEFAULT_FONT_SIZE = 28;
 const DEFAULT_COLOR = "#ffffff";
+const COVER_FRONT_START = 0;
+const COVER_FRONT_END = 48;
+const COVER_BACK_START = 52;
+const COVER_BACK_END = 100;
 
 function isValidHex(s) {
   return /^#[0-9A-Fa-f]{6}$/.test(s);
@@ -20,7 +24,8 @@ function isValidHex(s) {
 function newText(overrides = {}) {
   return {
     id: "t" + Date.now() + "-" + Math.random().toString(36).slice(2, 8),
-    content: "",
+    content: "טקסט",
+    side: "front",
     x: DEFAULT_X,
     y: DEFAULT_Y,
     fontSize: DEFAULT_FONT_SIZE,
@@ -30,18 +35,46 @@ function newText(overrides = {}) {
   };
 }
 
+function toEditorXForSide(storedX, side) {
+  const parsed = Number(storedX);
+  const x = Number.isFinite(parsed) ? parsed : DEFAULT_X;
+  if (side === "back") {
+    if (x >= COVER_BACK_START && x <= COVER_BACK_END) {
+      return ((x - COVER_BACK_START) / (COVER_BACK_END - COVER_BACK_START)) * 100;
+    }
+    return x;
+  }
+  if (x >= COVER_FRONT_START && x <= COVER_FRONT_END) {
+    return ((x - COVER_FRONT_START) / (COVER_FRONT_END - COVER_FRONT_START)) * 100;
+  }
+  return x;
+}
+
+function toStoredXBySide(editorX, side) {
+  const parsed = Number(editorX);
+  const local = Number.isFinite(parsed) ? parsed : DEFAULT_X;
+  const clamped = Math.max(0, Math.min(100, local));
+  if (side === "back") {
+    return COVER_BACK_START + (clamped / 100) * (COVER_BACK_END - COVER_BACK_START);
+  }
+  return COVER_FRONT_START + (clamped / 100) * (COVER_FRONT_END - COVER_FRONT_START);
+}
+
 function loadTextsFromConfig(cfg) {
   if (cfg.texts && Array.isArray(cfg.texts) && cfg.texts.length > 0) {
     return cfg.texts.map((t, i) => ({
       ...t,
       id: t.id || "t-" + i + "-" + Math.random().toString(36).slice(2, 8),
+      side: typeof t.side === "string" ? t.side : ((typeof t.x === "number" && t.x >= COVER_BACK_START) ? "back" : "front"),
+      x: toEditorXForSide(t.x, (typeof t.side === "string" ? t.side : ((typeof t.x === "number" && t.x >= COVER_BACK_START) ? "back" : "front"))),
       color: t.color || DEFAULT_COLOR,
     }));
   }
   if (cfg.headerText) {
     return [newText({
       content: cfg.headerText,
-      x: typeof cfg.headerX === "number" ? cfg.headerX : DEFAULT_X,
+      side: "front",
+      x: toEditorXForSide(typeof cfg.headerX === "number" ? cfg.headerX : DEFAULT_X, "front"),
       y: typeof cfg.headerY === "number" ? cfg.headerY : DEFAULT_Y,
       fontSize: typeof cfg.headerFontSize === "number" ? cfg.headerFontSize : DEFAULT_FONT_SIZE,
       color: DEFAULT_COLOR,
@@ -54,7 +87,8 @@ function loadTextsFromConfig(cfg) {
 export default function EditCover() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const coverFrameRef = useRef(null);
+  const frontCoverFrameRef = useRef(null);
+  const backCoverFrameRef = useRef(null);
   const coverUploadInputRef = useRef(null);
   const [album, setAlbum] = useState(null);
   const [premadeCovers, setPremadeCovers] = useState([]);
@@ -68,7 +102,7 @@ export default function EditCover() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [draggingId, setDraggingId] = useState(null);
-  const dragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+  const dragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0, side: "front" });
 
   useEffect(() => {
     let cancelled = false;
@@ -105,13 +139,13 @@ export default function EditCover() {
   const buildCoverConfigPayload = useCallback(() => {
     const prev = album?.cover_config || {};
     const nextTexts = texts
-      .filter((t) => t.content.trim() !== "")
       .map((t) => ({
         id: t.id,
-        content: t.content,
-        x: t.x,
-        y: t.y,
-        fontSize: t.fontSize,
+        content: typeof t.content === "string" ? t.content : "",
+        side: t.side === "back" ? "back" : "front",
+        x: toStoredXBySide(t.x, t.side === "back" ? "back" : "front"),
+        y: Number.isFinite(Number(t.y)) ? Number(t.y) : DEFAULT_Y,
+        fontSize: Number.isFinite(Number(t.fontSize)) ? Number(t.fontSize) : DEFAULT_FONT_SIZE,
         color: isValidHex(t.color) ? t.color : DEFAULT_COLOR,
         fontFamily: t.fontFamily || DEFAULT_FONT,
       }));
@@ -127,8 +161,8 @@ export default function EditCover() {
     setTexts((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
   }, []);
 
-  const addText = useCallback(() => {
-    const t = newText();
+  const addText = useCallback((side) => {
+    const t = newText({ side: side === "back" ? "back" : "front" });
     setTexts((prev) => [...prev, t]);
     setSelectedTextId(t.id);
   }, []);
@@ -144,20 +178,20 @@ export default function EditCover() {
     return { x: e.clientX, y: e.clientY };
   }, []);
 
-  const handleDragStart = useCallback((e, textId) => {
+  const handleDragStart = useCallback((e, textId, side) => {
     e.preventDefault();
     const t = texts.find((x) => x.id === textId);
     if (!t) return;
     setDraggingId(textId);
     const { x, y } = getCoords(e);
-    dragStartRef.current = { x: t.x, y: t.y, startX: x, startY: y };
+    dragStartRef.current = { x: t.x, y: t.y, startX: x, startY: y, side: side === "back" ? "back" : "front" };
   }, [texts, getCoords]);
 
   useEffect(() => {
     if (!draggingId) return;
-    const frame = coverFrameRef.current;
     const onMove = (e) => {
       e.preventDefault();
+      const frame = dragStartRef.current.side === "back" ? backCoverFrameRef.current : frontCoverFrameRef.current;
       const rect = frame?.getBoundingClientRect();
       if (!rect) return;
       const { x, y } = getCoords(e);
@@ -210,8 +244,8 @@ export default function EditCover() {
     autosaveTimerRef.current = window.setTimeout(() => {
       autosaveTimerRef.current = null;
       const cfg = buildCoverConfigPayload();
-      updateAlbum(id, { cover_config: cfg }).catch(() => {
-        /* silent — "המשך" saves again; avoids losing work when skipping Continue */
+      updateAlbum(id, { cover_config: cfg }).catch((e) => {
+        setError(e?.message || "שמירת הכריכה נכשלה");
       });
     }, 700);
     return () => window.clearTimeout(autosaveTimerRef.current);
@@ -237,6 +271,8 @@ export default function EditCover() {
   if (!album) return <AlbumLoading />;
 
   const currentCoverUrl = resolvedCoverUrl;
+  const frontTexts = texts.filter((t) => (t.side || "front") !== "back");
+  const backTexts = texts.filter((t) => t.side === "back");
 
   return (
     <div className={styles.page}>
@@ -258,62 +294,122 @@ export default function EditCover() {
       </div>
 
       <div className={styles.textToolbar}>
-        <button type="button" className={styles.addTextBtn} onClick={addText}>
-          + הוסף טקסט
-        </button>
         {texts.length > 0 && (
           <p className={styles.dragHint}>לחץ על טקסט על הכריכה כדי לבחור • גרור להזזה</p>
         )}
       </div>
 
       <div className={styles.preview}>
-        <div ref={coverFrameRef} className={styles.coverFrame}>
-          {currentCoverUrl ? (
-            <div
-              className={styles.coverFrameBg}
-              style={{ backgroundImage: `url("${currentCoverUrl}")` }}
-              aria-hidden
-            />
-          ) : null}
-          <div className={styles.coverOverlay} />
-          {texts.map((t) => (
-            <div
-              key={t.id}
-              className={
-                styles.coverTextDisplay +
-                (draggingId === t.id ? " " + styles.dragging : "") +
-                (selectedTextId === t.id ? " " + styles.selectedText : "")
-              }
-              style={{
-                left: `${t.x}%`,
-                top: `${t.y}%`,
-                transform: "translate(-50%, -50%)",
-                fontSize: `${t.fontSize}px`,
-                color: isValidHex(t.color) ? t.color : DEFAULT_COLOR,
-                fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
-              }}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-                setSelectedTextId(t.id);
-                handleDragStart(e, t.id);
-              }}
-              onTouchStart={(e) => {
-                e.stopPropagation();
-                setSelectedTextId(t.id);
-                handleDragStart(e, t.id);
-              }}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") setSelectedTextId(t.id);
-              }}
-              aria-label="טקסט על הכריכה"
-            >
-              <span className={styles.coverTitle}>
-                {t.content.trim() || "טקסט"}
-              </span>
+        <div className={styles.coverSplit}>
+          <div className={styles.coverPane}>
+            <button type="button" className={`${styles.addTextBtn} ${styles.coverPaneAddBtn}`} onClick={() => addText("front")}>
+              + טקסט לכריכה קדמית
+            </button>
+            <div ref={frontCoverFrameRef} className={styles.coverFrame}>
+              {currentCoverUrl ? (
+                <div
+                  className={`${styles.coverFrameBg} ${styles.coverClipRight}`}
+                  style={{ backgroundImage: `url("${currentCoverUrl}")` }}
+                  aria-hidden
+                />
+              ) : null}
+              <div className={styles.coverOverlay} />
+              {frontTexts.map((t) => (
+                <div
+                  key={t.id}
+                  className={
+                    styles.coverTextDisplay +
+                    (draggingId === t.id ? " " + styles.dragging : "") +
+                    (selectedTextId === t.id ? " " + styles.selectedText : "")
+                  }
+                  style={{
+                    left: `${t.x}%`,
+                    top: `${t.y}%`,
+                    transform: "translate(-50%, -50%)",
+                    fontSize: `${t.fontSize}px`,
+                    color: isValidHex(t.color) ? t.color : DEFAULT_COLOR,
+                    fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setSelectedTextId(t.id);
+                    handleDragStart(e, t.id, "front");
+                  }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    setSelectedTextId(t.id);
+                    handleDragStart(e, t.id, "front");
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") setSelectedTextId(t.id);
+                  }}
+                  aria-label="טקסט על כריכה קדמית"
+                >
+                  <span className={styles.coverTitle}>
+                    {t.content.trim() || "טקסט"}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
+            <p className={styles.coverPaneLabel}>כריכה קדמית</p>
+          </div>
+
+          <div className={styles.coverPane}>
+            <button type="button" className={`${styles.addTextBtn} ${styles.coverPaneAddBtn}`} onClick={() => addText("back")}>
+              + טקסט לכריכה אחורית
+            </button>
+            <div ref={backCoverFrameRef} className={styles.coverFrame}>
+              {currentCoverUrl ? (
+                <div
+                  className={`${styles.coverFrameBg} ${styles.coverClipLeft}`}
+                  style={{ backgroundImage: `url("${currentCoverUrl}")` }}
+                  aria-hidden
+                />
+              ) : null}
+              <div className={styles.coverOverlay} />
+              {backTexts.map((t) => (
+                <div
+                  key={t.id}
+                  className={
+                    styles.coverTextDisplay +
+                    (draggingId === t.id ? " " + styles.dragging : "") +
+                    (selectedTextId === t.id ? " " + styles.selectedText : "")
+                  }
+                  style={{
+                    left: `${t.x}%`,
+                    top: `${t.y}%`,
+                    transform: "translate(-50%, -50%)",
+                    fontSize: `${t.fontSize}px`,
+                    color: isValidHex(t.color) ? t.color : DEFAULT_COLOR,
+                    fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
+                  }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    setSelectedTextId(t.id);
+                    handleDragStart(e, t.id, "back");
+                  }}
+                  onTouchStart={(e) => {
+                    e.stopPropagation();
+                    setSelectedTextId(t.id);
+                    handleDragStart(e, t.id, "back");
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") setSelectedTextId(t.id);
+                  }}
+                  aria-label="טקסט על כריכה אחורית"
+                >
+                  <span className={styles.coverTitle}>
+                    {t.content.trim() || "טקסט"}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className={styles.coverPaneLabel}>כריכה אחורית</p>
+          </div>
         </div>
       </div>
 
