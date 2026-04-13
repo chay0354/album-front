@@ -333,7 +333,7 @@ const STICKER_DEFAULT_SIZE = 12;
 const PAGE_TEMPLATES = [
   { id: "1-full", name: "תמונה אחת", slots: [{ x: 5, y: 5, w: 90, h: 90, rotation: 0 }] },
   { id: "2-h", name: "2 אופקי", slots: [{ x: 2, y: 10, w: 46, h: 80, rotation: 0 }, { x: 52, y: 10, w: 46, h: 80, rotation: 0 }] },
-  { id: "2-v", name: "2 אנכי", slots: [{ x: 10, y: 2, w: 80, h: 46, rotation: 0 }, { x: 10, y: 52, w: 80, h: 46, rotation: 0 }] },
+  { id: "2-v", name: "2 אנכי", slots: [{ x: 2, y: 2, w: 96, h: 46, rotation: 0 }, { x: 2, y: 52, w: 96, h: 46, rotation: 0 }] },
   { id: "3-l", name: "3 (גדול+2)", slots: [{ x: 2, y: 5, w: 48, h: 90, rotation: 0 }, { x: 52, y: 5, w: 46, h: 43, rotation: 0 }, { x: 52, y: 52, w: 46, h: 46, rotation: 0 }] },
   { id: "4-grid", name: "4 רשת", slots: [{ x: 2, y: 2, w: 46, h: 46, rotation: 0 }, { x: 52, y: 2, w: 46, h: 46, rotation: 0 }, { x: 2, y: 52, w: 46, h: 46, rotation: 0 }, { x: 52, y: 52, w: 46, h: 46, rotation: 0 }] },
   {
@@ -3935,6 +3935,7 @@ export default function EditPages() {
   const [redoDepth, setRedoDepth] = useState(0);
   const [historyBusy, setHistoryBusy] = useState(false);
   const [bgDraftColor, setBgDraftColor] = useState(DEFAULT_PAGE_BG);
+  const [applyingBg, setApplyingBg] = useState(false);
   const studioFileInputRef = useRef(null);
   const uploadTargetPageIdRef = useRef(null);
   const uploadTargetSlotIndexRef = useRef(null);
@@ -5246,12 +5247,18 @@ export default function EditPages() {
               type="button"
               className={styles.cta}
               style={{ width: "100%", marginTop: "1rem" }}
+              disabled={applyingBg}
               onClick={async () => {
-                await setStudioBackgroundColor(bgDraftColor);
-                setShowBgSheet(false);
+                setApplyingBg(true);
+                try {
+                  await setStudioBackgroundColor(bgDraftColor);
+                  setShowBgSheet(false);
+                } finally {
+                  setApplyingBg(false);
+                }
               }}
             >
-              החלת רקע
+              {applyingBg ? "מחיל..." : "החלת רקע"}
             </button>
           </div>
         </div>
