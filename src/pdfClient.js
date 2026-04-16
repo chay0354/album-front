@@ -23,7 +23,7 @@ export function buildPdfBlobFromJpegDataUrls(jpegDataUrls) {
         const dh = ih * scale;
         const dx = (w - dw) / 2;
         const dy = (h - dh) / 2;
-        pdf.addImage(dataUrl, "JPEG", dx, dy, dw, dh, undefined, "MEDIUM");
+        pdf.addImage(dataUrl, "JPEG", dx, dy, dw, dh, undefined, "SLOW");
       }
     } catch (_) {
       /* Invalid raster — keep this PDF sheet blank so page count matches album. */

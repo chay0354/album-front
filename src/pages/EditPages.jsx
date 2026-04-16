@@ -470,9 +470,11 @@ function setMinimalDragImage(e) {
   setTimeout(() => el.remove(), 0);
 }
 
-/** Raster page size before embedding in A4 PDF (~2× jsPDF pt for sharper output). */
-const PDF_OUT_W = 1190;
-const PDF_OUT_H = 1684;
+/** Raster page size before embedding in A4 PDF. A4 at 300 DPI = 2480×3508 (HD print). */
+const PDF_OUT_W = 2480;
+const PDF_OUT_H = 3508;
+const PDF_JPEG_QUALITY = 0.98;
+const PDF_CAPTURE_TARGET_W = 3000;
 
 const COVER_FRONT_START = 0;
 const COVER_FRONT_END = 48;
@@ -510,22 +512,22 @@ async function captureVisibleElementToPdfJpeg(el) {
   await new Promise((r) => requestAnimationFrame(r));
   await new Promise((r) => requestAnimationFrame(r));
 
-  const pr = Math.min(4, Math.max(2, Math.ceil(1800 / Math.max(1, el.offsetWidth))));
+  const pr = Math.min(8, Math.max(3, Math.ceil(PDF_CAPTURE_TARGET_W / Math.max(1, el.offsetWidth))));
 
   let dataUrl;
   try {
     dataUrl = await domToJpeg(el, {
-      quality: 0.95,
+      quality: PDF_JPEG_QUALITY,
       scale: pr,
       fetch: { bypassingCache: true },
       drawImageInterval: 150,
-      timeout: 45000,
+      timeout: 60000,
     });
   } catch (e1) {
     console.warn("[PDF] domToJpeg failed:", e1?.message || e1);
     try {
       dataUrl = await toJpeg(el, {
-        quality: 0.93,
+        quality: PDF_JPEG_QUALITY,
         pixelRatio: pr,
         cacheBust: true,
         skipFonts: false,
@@ -538,11 +540,11 @@ async function captureVisibleElementToPdfJpeg(el) {
         foreignObjectRendering: true,
         logging: false,
         backgroundColor: null,
-        imageTimeout: 20000,
+        imageTimeout: 30000,
         scrollX: 0,
         scrollY: -window.scrollY,
       });
-      dataUrl = canvas.toDataURL("image/jpeg", 0.93);
+      dataUrl = canvas.toDataURL("image/jpeg", PDF_JPEG_QUALITY);
     }
   }
 
@@ -567,14 +569,16 @@ async function captureVisibleElementToPdfJpeg(el) {
   const nw = img.naturalWidth;
   const nh = img.naturalHeight;
   /* Blank / empty regions may decode to 0×0 — still emit a white PDF page so page count matches. */
-  if (!decodeOk || nw < 1 || nh < 1) return out.toDataURL("image/jpeg", 0.93);
+  if (!decodeOk || nw < 1 || nh < 1) return out.toDataURL("image/jpeg", PDF_JPEG_QUALITY);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   const scale = Math.min(PDF_OUT_W / nw, PDF_OUT_H / nh);
   const dw = nw * scale;
   const dh = nh * scale;
   const dx = (PDF_OUT_W - dw) / 2;
   const dy = (PDF_OUT_H - dh) / 2;
   ctx.drawImage(img, 0, 0, nw, nh, dx, dy, dw, dh);
-  return out.toDataURL("image/jpeg", 0.93);
+  return out.toDataURL("image/jpeg", PDF_JPEG_QUALITY);
 }
 
 /** Mini preview in “כל העמודים” sheet — single spread half-page. */
