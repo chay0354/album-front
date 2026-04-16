@@ -471,10 +471,42 @@ function setMinimalDragImage(e) {
 }
 
 /** Raster page size before embedding in A4 PDF. A4 at 300 DPI = 2480×3508 (HD print). */
-const PDF_OUT_W = 2480;
-const PDF_OUT_H = 3508;
-const PDF_JPEG_QUALITY = 0.98;
-const PDF_CAPTURE_TARGET_W = 3000;
+const PDF_OUT_W_DESKTOP = 2480;
+const PDF_OUT_H_DESKTOP = 3508;
+const PDF_OUT_W_MOBILE = 1587;
+const PDF_OUT_H_MOBILE = 2245;
+const PDF_CAPTURE_TARGET_W_DESKTOP = 3000;
+const PDF_CAPTURE_TARGET_W_MOBILE = 1700;
+const PDF_CAPTURE_MAX_PR_DESKTOP = 8;
+const PDF_CAPTURE_MAX_PR_MOBILE = 3;
+const PDF_JPEG_QUALITY_DESKTOP = 0.98;
+const PDF_JPEG_QUALITY_MOBILE = 0.9;
+
+function isMobileUserAgent() {
+  if (typeof navigator === "undefined") return false;
+  const ua = String(navigator.userAgent || "");
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && (navigator.maxTouchPoints || 0) > 1);
+  return isIOS || /Android|Mobile|IEMobile|Opera Mini/i.test(ua);
+}
+
+function getPdfCaptureSettings() {
+  const mobile = isMobileUserAgent();
+  return mobile
+    ? {
+        outW: PDF_OUT_W_MOBILE,
+        outH: PDF_OUT_H_MOBILE,
+        targetW: PDF_CAPTURE_TARGET_W_MOBILE,
+        maxPr: PDF_CAPTURE_MAX_PR_MOBILE,
+        quality: PDF_JPEG_QUALITY_MOBILE,
+      }
+    : {
+        outW: PDF_OUT_W_DESKTOP,
+        outH: PDF_OUT_H_DESKTOP,
+        targetW: PDF_CAPTURE_TARGET_W_DESKTOP,
+        maxPr: PDF_CAPTURE_MAX_PR_DESKTOP,
+        quality: PDF_JPEG_QUALITY_DESKTOP,
+      };
+}
 
 const COVER_FRONT_START = 0;
 const COVER_FRONT_END = 48;
@@ -512,12 +544,16 @@ async function captureVisibleElementToPdfJpeg(el) {
   await new Promise((r) => requestAnimationFrame(r));
   await new Promise((r) => requestAnimationFrame(r));
 
-  const pr = Math.min(8, Math.max(3, Math.ceil(PDF_CAPTURE_TARGET_W / Math.max(1, el.offsetWidth))));
+  const cfg = getPdfCaptureSettings();
+  const pr = Math.min(
+    cfg.maxPr,
+    Math.max(2, Math.ceil(cfg.targetW / Math.max(1, el.offsetWidth)))
+  );
 
   let dataUrl;
   try {
     dataUrl = await domToJpeg(el, {
-      quality: PDF_JPEG_QUALITY,
+      quality: cfg.quality,
       scale: pr,
       fetch: { bypassingCache: true },
       drawImageInterval: 150,
@@ -527,7 +563,7 @@ async function captureVisibleElementToPdfJpeg(el) {
     console.warn("[PDF] domToJpeg failed:", e1?.message || e1);
     try {
       dataUrl = await toJpeg(el, {
-        quality: PDF_JPEG_QUALITY,
+        quality: cfg.quality,
         pixelRatio: pr,
         cacheBust: true,
         skipFonts: false,
@@ -544,7 +580,7 @@ async function captureVisibleElementToPdfJpeg(el) {
         scrollX: 0,
         scrollY: -window.scrollY,
       });
-      dataUrl = canvas.toDataURL("image/jpeg", PDF_JPEG_QUALITY);
+      dataUrl = canvas.toDataURL("image/jpeg", cfg.quality);
     }
   }
 
@@ -560,25 +596,25 @@ async function captureVisibleElementToPdfJpeg(el) {
   });
 
   const out = document.createElement("canvas");
-  out.width = PDF_OUT_W;
-  out.height = PDF_OUT_H;
+  out.width = cfg.outW;
+  out.height = cfg.outH;
   const ctx = out.getContext("2d");
   if (!ctx) throw new Error("PDF capture: no canvas context");
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, PDF_OUT_W, PDF_OUT_H);
+  ctx.fillRect(0, 0, cfg.outW, cfg.outH);
   const nw = img.naturalWidth;
   const nh = img.naturalHeight;
   /* Blank / empty regions may decode to 0×0 — still emit a white PDF page so page count matches. */
-  if (!decodeOk || nw < 1 || nh < 1) return out.toDataURL("image/jpeg", PDF_JPEG_QUALITY);
+  if (!decodeOk || nw < 1 || nh < 1) return out.toDataURL("image/jpeg", cfg.quality);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
-  const scale = Math.min(PDF_OUT_W / nw, PDF_OUT_H / nh);
+  const scale = Math.min(cfg.outW / nw, cfg.outH / nh);
   const dw = nw * scale;
   const dh = nh * scale;
-  const dx = (PDF_OUT_W - dw) / 2;
-  const dy = (PDF_OUT_H - dh) / 2;
+  const dx = (cfg.outW - dw) / 2;
+  const dy = (cfg.outH - dh) / 2;
   ctx.drawImage(img, 0, 0, nw, nh, dx, dy, dw, dh);
-  return out.toDataURL("image/jpeg", PDF_JPEG_QUALITY);
+  return out.toDataURL("image/jpeg", cfg.quality);
 }
 
 /** Mini preview in “כל העמודים” sheet — single spread half-page. */
@@ -3996,6 +4032,8 @@ export default function EditPages() {
         if (!el) throw new Error("לא נמצא תוכן לצילום PDF");
 
         images.push(await captureVisibleElementToPdfJpeg(el));
+        // Yield between captures so iOS Safari can reclaim canvas memory before the next page.
+        await new Promise((r) => setTimeout(r, 50));
       }
 
       const blob = buildPdfBlobFromJpegDataUrls(images);
