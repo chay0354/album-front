@@ -184,26 +184,9 @@ export default function ViewAlbum() {
           className={styles.bookFrame + (isStandaloneCover || isStandaloneBack ? " " + styles.standaloneCoverFrame : "")}
         >
           {isStandaloneCover ? (
-            <div
-              className={styles.standaloneCoverWrap}
-              style={{
-                transform: `scale(${bookScale})`,
-                transformOrigin: "top center",
-              }}
-            >
-              <StandaloneCover album={album} coverUrl={coverUrl} />
-            </div>
+            <StandaloneCover album={album} coverUrl={coverUrl} />
           ) : isStandaloneBack ? (
-            <div
-              key="standalone-back"
-              className={styles.standaloneCoverWrap + " " + styles.standaloneCoverWrapBack}
-              style={{
-                transform: `scale(${bookScale})`,
-                transformOrigin: "top center",
-              }}
-            >
-              <StandaloneBackCover album={album} coverUrl={coverUrl} />
-            </div>
+            <StandaloneBackCover key="standalone-back" album={album} coverUrl={coverUrl} />
           ) : (
             <div
               className={styles.bookContainer}

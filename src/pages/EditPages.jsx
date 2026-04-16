@@ -474,104 +474,32 @@ function setMinimalDragImage(e) {
 const PDF_OUT_W = 1190;
 const PDF_OUT_H = 1684;
 
-function parseCoverTexts(cfg) {
-  if (Array.isArray(cfg?.texts) && cfg.texts.length > 0) return cfg.texts;
-  if (cfg?.headerText) {
-    return [
-      {
-        content: cfg.headerText,
-        x: cfg.headerX ?? 50,
-        y: cfg.headerY ?? 18,
-        fontSize: cfg.headerFontSize ?? 28,
-        color: "#ffffff",
-        fontFamily: cfg.headerFontFamily || DEFAULT_FONT,
-      },
-    ];
-  }
-  return [];
+const COVER_FRONT_START = 0;
+const COVER_FRONT_END = 48;
+const COVER_BACK_START = 52;
+const COVER_BACK_END = 100;
+
+function resolveCoverTextSide(t) {
+  if (t?.side === "back") return "back";
+  if (t?.side === "front") return "front";
+  const x = Number(t?.x);
+  if (Number.isFinite(x) && x >= COVER_BACK_START) return "back";
+  return "front";
 }
 
-async function captureCoverToPdfJpeg(coverUrl, coverConfig, coverEl) {
-  const rect = coverEl?.getBoundingClientRect();
-  const cssW = Math.max(1, Math.round(rect?.width || 700));
-  const cssH = Math.max(1, Math.round(rect?.height || 500));
-  const pixelRatio = Math.min(4, Math.max(2, Math.ceil(1800 / cssW)));
-  const stageW = Math.max(1, Math.round(cssW * pixelRatio));
-  const stageH = Math.max(1, Math.round(cssH * pixelRatio));
-
-  const stage = document.createElement("canvas");
-  stage.width = stageW;
-  stage.height = stageH;
-  const sctx = stage.getContext("2d");
-  if (!sctx) throw new Error("PDF cover capture: no stage context");
-  sctx.fillStyle = "#ffffff";
-  sctx.fillRect(0, 0, stageW, stageH);
-
-  let imgBounds = { x: 0, y: 0, w: stageW, h: stageH };
-  if (coverUrl) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    const loaded = await new Promise((resolve) => {
-      img.onload = () => resolve(true);
-      img.onerror = () => resolve(false);
-      img.src = coverUrl;
-    });
-    if (loaded && img.naturalWidth > 0 && img.naturalHeight > 0) {
-      const scale = Math.min(stageW / img.naturalWidth, stageH / img.naturalHeight);
-      const dw = img.naturalWidth * scale;
-      const dh = img.naturalHeight * scale;
-      const dx = (stageW - dw) / 2;
-      const dy = (stageH - dh) / 2;
-      sctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, dx, dy, dw, dh);
-      imgBounds = { x: dx, y: dy, w: dw, h: dh };
+function toCoverPaneX(storedX, side) {
+  const parsed = Number(storedX);
+  const x = Number.isFinite(parsed) ? parsed : 50;
+  if (side === "back") {
+    if (x >= COVER_BACK_START && x <= COVER_BACK_END) {
+      return ((x - COVER_BACK_START) / (COVER_BACK_END - COVER_BACK_START)) * 100;
     }
+    return Math.max(0, Math.min(100, x));
   }
-
-  const texts = parseCoverTexts(coverConfig || {});
-  texts.forEach((t) => {
-    const content = String(t?.content || "").trim();
-    if (!content) return;
-    const xNum = Number(t?.x);
-    const yNum = Number(t?.y);
-    const xPct = Number.isFinite(xNum) ? xNum : 50;
-    const yPct = Number.isFinite(yNum) ? yNum : 18;
-    const fontNum = Number(t?.fontSize);
-    const fontSizeCss = Math.max(10, Number.isFinite(fontNum) ? fontNum : 28);
-    const fill = /^#[0-9A-Fa-f]{6}$/.test(t?.color || "") ? t.color : "#ffffff";
-    const fontFamily = getFontStack(t?.fontFamily || DEFAULT_FONT);
-    const x = (xPct / 100) * stageW;
-    const y = (yPct / 100) * stageH;
-    sctx.textAlign = "center";
-    sctx.font = `${fontSizeCss * pixelRatio}px ${fontFamily}`;
-    const m = sctx.measureText(content);
-    const ascent = m.actualBoundingBoxAscent || fontSizeCss * pixelRatio * 0.8;
-    const descent = m.actualBoundingBoxDescent || fontSizeCss * pixelRatio * 0.2;
-    const textH = ascent + descent;
-    // Match CSS `translate(-50%, -50%)` anchoring more accurately.
-    const yTop = y - textH / 2;
-    sctx.textBaseline = "top";
-    sctx.fillStyle = fill;
-    sctx.shadowColor = "rgba(0,0,0,0.35)";
-    sctx.shadowBlur = 2 * pixelRatio;
-    sctx.fillText(content, x, yTop);
-    sctx.shadowBlur = 0;
-  });
-
-  const out = document.createElement("canvas");
-  out.width = PDF_OUT_W;
-  out.height = PDF_OUT_H;
-  const ctx = out.getContext("2d");
-  if (!ctx) throw new Error("PDF capture: no canvas context");
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, PDF_OUT_W, PDF_OUT_H);
-  const scale = Math.min(PDF_OUT_W / stageW, PDF_OUT_H / stageH);
-  const dw = stageW * scale;
-  const dh = stageH * scale;
-  const dx = (PDF_OUT_W - dw) / 2;
-  const dy = (PDF_OUT_H - dh) / 2;
-  ctx.drawImage(stage, 0, 0, stageW, stageH, dx, dy, dw, dh);
-
-  return out.toDataURL("image/jpeg", 0.93);
+  if (x >= COVER_FRONT_START && x <= COVER_FRONT_END) {
+    return ((x - COVER_FRONT_START) / (COVER_FRONT_END - COVER_FRONT_START)) * 100;
+  }
+  return Math.max(0, Math.min(100, x));
 }
 
 /** Raster snapshot of the visible page (pixels only — no PDF font encoding). Order: modern-screenshot → html-to-image → html2canvas. */
@@ -766,41 +694,73 @@ function StudioSheetCoverThumb({ album, coverUrl }) {
 
 function AlbumCover({ album, coverUrl, pdfCaptureMode = false }) {
   const cfg = album?.cover_config || {};
-  const texts = Array.isArray(cfg.texts) && cfg.texts.length > 0
+  const rawTexts = Array.isArray(cfg.texts) && cfg.texts.length > 0
     ? cfg.texts
     : cfg.headerText
       ? [{ content: cfg.headerText, x: cfg.headerX ?? 50, y: cfg.headerY ?? 18, fontSize: cfg.headerFontSize ?? 28, color: "#ffffff" }]
       : [];
-  const coverStyle = coverUrl
-    ? pdfCaptureMode
-      ? {
-          backgroundImage: `url("${coverUrl}")`,
-          backgroundPosition: "center center",
-          backgroundSize: "contain",
-          backgroundRepeat: "no-repeat",
-          backgroundColor: "#fff",
-        }
-      : { backgroundImage: `url("${coverUrl}")`, background: `center/cover no-repeat url("${coverUrl}")` }
-    : {};
+  const texts = rawTexts.map((t) => {
+    const side = resolveCoverTextSide(t);
+    return { ...t, side, paneX: toCoverPaneX(t?.x, side) };
+  });
+  const frontTexts = texts.filter((t) => t.side !== "back");
+  const backTexts = texts.filter((t) => t.side === "back");
+  const coverPaneBgStyle = coverUrl ? { backgroundImage: `url("${coverUrl}")` } : null;
+  const emptyCoverPaneStyle = coverUrl ? undefined : { backgroundColor: "var(--surface2)" };
+
   return (
-    <div className={styles.coverSingle} style={coverStyle} data-pdf-capture="cover">
-      <div className={styles.coverOverlay} />
-      {texts.map((t, i) => (
-        <div
-          key={i}
-          className={styles.coverTitleOnModel}
-          style={{
-            left: `${t.x ?? 50}%`,
-            top: `${t.y ?? 18}%`,
-            transform: "translate(-50%, -50%)",
-            fontSize: `${t.fontSize ?? 28}px`,
-            color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
-            fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
-          }}
-        >
-          {t.content}
-        </div>
-      ))}
+    <div
+      className={`${styles.coverSingle}${pdfCaptureMode ? " " + styles.coverSinglePdf : ""}`}
+      data-pdf-capture="cover"
+    >
+      <div className={styles.coverPanePreview}>
+        {coverPaneBgStyle && (
+          <div className={`${styles.coverPaneBg} ${styles.coverPaneClipFront}`} style={coverPaneBgStyle} aria-hidden />
+        )}
+        <div className={styles.coverOverlay} />
+        {frontTexts.map((t, i) => (
+          <div
+            key={t.id || `f-${i}`}
+            className={styles.coverTitleOnModel}
+            style={{
+              left: `${t.paneX ?? 50}%`,
+              top: `${t.y ?? 18}%`,
+              transform: "translate(-50%, -50%)",
+              fontSize: `${t.fontSize ?? 28}px`,
+              color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
+              fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
+            }}
+          >
+            <span className={styles.coverTitleOnModelText}>
+              {(typeof t.content === "string" ? t.content.trim() : "") || "טקסט"}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className={styles.coverPanePreview} style={emptyCoverPaneStyle}>
+        {coverPaneBgStyle && (
+          <div className={`${styles.coverPaneBg} ${styles.coverPaneClipBack}`} style={coverPaneBgStyle} aria-hidden />
+        )}
+        <div className={styles.coverOverlay} />
+        {backTexts.map((t, i) => (
+          <div
+            key={t.id || `b-${i}`}
+            className={styles.coverTitleOnModel}
+            style={{
+              left: `${t.paneX ?? 50}%`,
+              top: `${t.y ?? 18}%`,
+              transform: "translate(-50%, -50%)",
+              fontSize: `${t.fontSize ?? 28}px`,
+              color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
+              fontFamily: getFontStack(t.fontFamily || DEFAULT_FONT),
+            }}
+          >
+            <span className={styles.coverTitleOnModelText}>
+              {(typeof t.content === "string" ? t.content.trim() : "") || "טקסט"}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -2982,8 +2942,9 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
           SPREAD_LAYOUT_MIN,
           SPREAD_LAYOUT_MAX
         );
-        const otherIds = sorted.filter((p) => p.id !== ref.photoId).map((p) => p.id);
-        const { vTargets, hTargets } = buildSpreadSnapTargets(templateSlots, layoutsRef.current, otherIds);
+        // Keep resize snapping to page/template rails, but don't magnetize to other photos.
+        // This allows stretching one photo over another without feeling blocked.
+        const { vTargets, hTargets } = buildSpreadSnapTargets(templateSlots, layoutsRef.current, []);
         const resizeTh = templateSlots?.length ? SPREAD_SNAP_RESIZE_THRESHOLD : SPREAD_SNAP_RESIZE_THRESHOLD * 0.85;
         const snapped = snapSpreadResizeToTargets(
           ref.handle,
@@ -4029,12 +3990,6 @@ export default function EditPages() {
           step.kind === "cover" ? '[data-pdf-capture="cover"]' : `[data-pdf-capture="${step.side}"]`;
         const el = document.querySelector(selector);
         if (!el) throw new Error("לא נמצא תוכן לצילום PDF");
-
-        if (step.kind === "cover") {
-          const coverRaster = await captureCoverToPdfJpeg(coverUrl, album?.cover_config || {}, el);
-          images.push(coverRaster);
-          continue;
-        }
 
         images.push(await captureVisibleElementToPdfJpeg(el));
       }

@@ -56,16 +56,19 @@
 
 .coverSplit {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: 6px;
+  flex-wrap: nowrap;
   flex-direction: row-reverse;
+  width: min(100%, 436px);
+  max-width: 436px;
+  margin: 0 auto;
 }
 
 .coverPane {
-  width: min(48%, 280px);
-  min-width: 220px;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
 .coverPaneLabel {
@@ -76,12 +79,14 @@
 }
 
 .coverFrame {
+  width: 100%;
   aspect-ratio: 210 / 297;
   margin: 0 auto;
-  border-radius: var(--radius);
+  border-radius: 8px;
   background: var(--surface2);
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow), var(--shadow-strong);
 }
 
 .coverFrameBg {
@@ -526,8 +531,8 @@
     gap: 0.55rem;
   }
   .coverPane {
-    width: min(48%, 220px);
-    min-width: 160px;
+    flex: 1 1 0;
+    min-width: 0;
   }
   .textToolbar {
     gap: 0.5rem;

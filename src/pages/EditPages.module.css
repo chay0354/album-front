@@ -97,33 +97,69 @@
 
 /* Single cover (view 0) */
 .coverSingle {
-  aspect-ratio: 7/5;
-  width: 100%;
-  max-width: 440px;
-  border-radius: 4px;
-  background-color: var(--surface2);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  width: min(100%, 436px);
+  max-width: 436px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.coverPanePreview {
   position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
+  aspect-ratio: 210 / 297;
+  border-radius: 8px;
   overflow: hidden;
   box-shadow: var(--shadow), var(--shadow-strong);
+  background: var(--surface2);
+}
+
+.coverPaneBg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.coverPaneClipFront {
+  background-position: left center;
+  background-size: 192% 100%;
+}
+
+.coverPaneClipBack {
+  background-position: right center;
+  background-size: 208% 100%;
 }
 
 .coverOverlay {
   position: absolute;
   inset: 0;
+  z-index: 1;
   pointer-events: none;
 }
 
 .coverTitleOnModel {
   position: absolute;
-  color: #fff;
-  font-weight: 600;
+  z-index: 2;
   white-space: nowrap;
   max-width: 90%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  text-align: center;
+  padding: 0.25rem 0.5rem;
+  pointer-events: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.coverTitleOnModelText {
+  display: block;
+  font-weight: 600;
   pointer-events: none;
 }
 
@@ -3521,15 +3557,36 @@
 
 /* Same visual frame as one studio half-page → same snapshot + scale-to-A4 path as inner pages */
 :global(body.pdfCaptureMode) .coverSingle {
+  max-width: 436px;
+  gap: 0 !important;
+}
+
+:global(body.pdfCaptureMode) .coverPanePreview {
   box-shadow: none !important;
-  aspect-ratio: 7 / 5;
-  max-width: 440px;
-  width: 100%;
-  margin-left: auto;
-  margin-right: auto;
   border-radius: 0;
-  background-size: contain !important;
-  background-position: center center !important;
-  background-repeat: no-repeat !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+:global(body.pdfCaptureMode) .coverSinglePdf .coverPanePreview {
   background-color: #fff !important;
+}
+
+:global(body.pdfCaptureMode) .coverSinglePdf .coverPaneBg {
+  background-repeat: no-repeat !important;
+}
+
+:global(body.pdfCaptureMode) .coverSinglePdf .coverPaneClipFront {
+  background-position: left center !important;
+  background-size: 192% 100% !important;
+}
+
+:global(body.pdfCaptureMode) .coverSinglePdf .coverPaneClipBack {
+  background-position: right center !important;
+  background-size: 208% 100% !important;
+}
+
+:global(body.pdfCaptureMode) .coverSinglePdf {
+  width: 100%;
+  margin-inline: auto;
 }

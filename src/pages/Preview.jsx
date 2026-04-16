@@ -142,31 +142,39 @@ export const BackCoverPage = forwardRef(function BackCoverPage({ album, coverUrl
 export function StandaloneCover({ album, coverUrl }) {
   const cfg = album?.cover_config || {};
   const texts = getCoverTexts(cfg)
-    .map((t) => normalizeCoverTextForSide(t, "front"))
+    .map((t) => projectTextToCoverSide(t, COVER_FRONT_START, COVER_FRONT_END))
     .filter(Boolean);
   const coverStyle = coverUrl
     ? { backgroundImage: `url("${coverUrl}")` }
     : { background: "#333" };
   return (
-    <div className={styles.standaloneCover}>
-      <div className={styles.standaloneCoverImg + " " + styles.standaloneCoverImgFront} style={coverStyle} />
-      {texts.map((t, i) => {
-        return (
-          <div
-            key={i}
-            className={styles.flipPageCoverText}
-            style={{
-              left: `${t.x ?? 50}%`,
-              top: `${t.y ?? 18}%`,
-              fontSize: `${t.fontSize ?? 28}px`,
-              color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
-              fontFamily: getFontStack(t.fontFamily),
-            }}
-          >
-            {t.content}
-          </div>
-        );
-      })}
+    <div className={styles.standaloneCoverPane}>
+      {coverUrl && (
+        <div
+          className={styles.standaloneCoverPaneBg + " " + styles.standaloneCoverPaneClipFront}
+          style={coverStyle}
+          aria-hidden
+        />
+      )}
+      <div className={styles.standaloneCoverPaneOverlay} />
+      {texts.map((t, i) => (
+        <div
+          key={i}
+          className={styles.standaloneCoverPaneText}
+          style={{
+            left: `${t.x ?? 50}%`,
+            top: `${t.y ?? 18}%`,
+            transform: "translate(-50%, -50%)",
+            fontSize: `${t.fontSize ?? 28}px`,
+            color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
+            fontFamily: getFontStack(t.fontFamily),
+          }}
+        >
+          <span className={styles.standaloneCoverPaneTextInner}>
+            {(typeof t.content === "string" ? t.content.trim() : "") || "טקסט"}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -175,31 +183,39 @@ export function StandaloneCover({ album, coverUrl }) {
 export function StandaloneBackCover({ album, coverUrl }) {
   const cfg = album?.cover_config || {};
   const texts = getCoverTexts(cfg)
-    .map((t) => normalizeCoverTextForSide(t, "back"))
+    .map((t) => projectTextToCoverSide(t, COVER_BACK_START, COVER_BACK_END))
     .filter(Boolean);
   const coverStyle = coverUrl
     ? { backgroundImage: `url("${coverUrl}")` }
     : { background: "#333" };
   return (
-    <div className={styles.standaloneCover}>
-      <div className={styles.standaloneCoverImg + " " + styles.standaloneCoverImgBack} style={coverStyle} />
-      {texts.map((t, i) => {
-        return (
-          <div
-            key={i}
-            className={styles.flipPageCoverText}
-            style={{
-              left: `${t.x ?? 50}%`,
-              top: `${t.y ?? 18}%`,
-              fontSize: `${t.fontSize ?? 28}px`,
-              color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
-              fontFamily: getFontStack(t.fontFamily),
-            }}
-          >
-            {t.content}
-          </div>
-        );
-      })}
+    <div className={styles.standaloneCoverPane}>
+      {coverUrl && (
+        <div
+          className={styles.standaloneCoverPaneBg + " " + styles.standaloneCoverPaneClipBack}
+          style={coverStyle}
+          aria-hidden
+        />
+      )}
+      <div className={styles.standaloneCoverPaneOverlay} />
+      {texts.map((t, i) => (
+        <div
+          key={i}
+          className={styles.standaloneCoverPaneText}
+          style={{
+            left: `${t.x ?? 50}%`,
+            top: `${t.y ?? 18}%`,
+            transform: "translate(-50%, -50%)",
+            fontSize: `${t.fontSize ?? 28}px`,
+            color: /^#[0-9A-Fa-f]{6}$/.test(t.color) ? t.color : "#fff",
+            fontFamily: getFontStack(t.fontFamily),
+          }}
+        >
+          <span className={styles.standaloneCoverPaneTextInner}>
+            {(typeof t.content === "string" ? t.content.trim() : "") || "טקסט"}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -504,26 +520,9 @@ export default function Preview() {
           className={styles.bookFrame + (isStandaloneCover || isStandaloneBack ? " " + styles.standaloneCoverFrame : "")}
         >
           {isStandaloneCover ? (
-            <div
-              className={styles.standaloneCoverWrap}
-              style={{
-                transform: `scale(${bookScale})`,
-                transformOrigin: "top center",
-              }}
-            >
-              <StandaloneCover album={album} coverUrl={coverUrl} />
-            </div>
+            <StandaloneCover album={album} coverUrl={coverUrl} />
           ) : isStandaloneBack ? (
-            <div
-              key="standalone-back"
-              className={styles.standaloneCoverWrap}
-              style={{
-                transform: `scale(${bookScale})`,
-                transformOrigin: "top center",
-              }}
-            >
-              <StandaloneBackCover album={album} coverUrl={coverUrl} />
-            </div>
+            <StandaloneBackCover key="standalone-back" album={album} coverUrl={coverUrl} />
           ) : (
             <div
               className={styles.bookContainer}
