@@ -37,6 +37,7 @@
   background: #25d366;
   color: #fff;
   cursor: pointer;
+  text-decoration: none;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 

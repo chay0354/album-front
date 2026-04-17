@@ -6,7 +6,6 @@ import { getFontStack } from "../constants/fonts";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { getMyglobyCheckoutUrl } from "../myglobyCheckout";
-import { openPaymentTabOnUserClick } from "../paymentTabBridge";
 import styles from "./Preview.module.css";
 
 const DEFAULT_LAYOUT = (index) => {
@@ -603,8 +602,7 @@ export default function Preview() {
         <button
           type="button"
           onClick={() => {
-            const cartUrl = getMyglobyCheckoutUrl((album?.pages || []).length);
-            openPaymentTabOnUserClick(cartUrl);
+            // Do NOT open the payment tab here — it must open only after the PDF finishes saving.
             navigate(`/album/${id}/pages`, { state: { openPdfFinish: true } });
           }}
           className={styles.cta}

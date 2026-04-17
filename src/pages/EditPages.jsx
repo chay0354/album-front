@@ -4051,9 +4051,18 @@ export default function EditPages() {
       flushSync(() => {
         setGeneratingPdf(false);
       });
-      const payNavigated = finishPaymentTabNavigation();
-      setPostPdfPayFallbackUrl(payNavigated ? null : cartUrl);
+      // Clear any leftover bookkeeping from the older "open cart on click" flow.
+      finishPaymentTabNavigation();
       setPostPdfThanksVisible(true);
+      // Always navigate AFTER the PDF is fully saved. Same-tab navigation is not popup-blocked.
+      if (cartUrl) {
+        setPostPdfPayFallbackUrl(cartUrl);
+        try {
+          window.location.assign(cartUrl);
+        } catch (_) {
+          /* fallback link is shown via postPdfPayFallbackUrl */
+        }
+      }
     } catch (e) {
       abortPaymentFlowAfterPdfFailure();
       setError(e.message || "שגיאה ביצירת PDF");
@@ -4834,10 +4843,7 @@ export default function EditPages() {
         <div className={styles.editorUploadBusyOverlay} role="status" aria-live="polite" aria-busy="true">
           <div className={styles.editorUploadBusyCard}>
             <span className={styles.editorUploadSpinner} aria-hidden />
-            <span>שומרים ומסיימים…</span>
-            <span style={{ fontSize: "0.85rem", opacity: 0.9, marginTop: "0.35rem", textAlign: "center" }}>
-              נשמר כאן ה־PDF; אם נפתחה לשונית תשלום — אפשר להמשיך שם. בסיום יוצג אישור.
-            </span>
+            <span>שומר את האלבום...</span>
           </div>
         </div>
       )}
