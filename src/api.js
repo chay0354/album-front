@@ -1,6 +1,11 @@
+import { getSupabaseBrowserClient } from "./supabaseClient.js";
+
 // In dev use proxy (/api). In production set VITE_API_URL to your backend origin (e.g. https://album-back.vercel.app)
 const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, "") : "";
 const API = API_BASE ? API_BASE + "/api" : "/api";
+
+/** Stay under Vercel ~4.5 MB request cap for multipart PDF upload; larger → Supabase signed upload. */
+const PDF_DIRECT_UPLOAD_MAX_BYTES = 4_000_000;
 
 /** Vercel serverless has 4.5 MB request body limit. Compress so single or multiple photos fit. */
 const MAX_FILE_SIZE = 1.4 * 1024 * 1024; // 1.4 MB per file so 3 photos stay under 4.5 MB
@@ -290,17 +295,51 @@ export function getPdfDownloadUrl(albumId) {
   return `${API_BASE || ""}/api/pdf/generate/${albumId}`;
 }
 
-/** Generate PDF from client-rendered page images (fixes Hebrew on iPhone). Returns { blob, pdfUrl }. */
-export async function generatePdfFromImages(albumId, imageDataUrls) {
-  const r = await fetch(`${API}/pdf/generate-from-images`, {
+/**
+ * Register client-built PDF (same pixels as local jsPDF) for delivery / analytics.
+ * Small files: multipart to API. Large: Supabase signed upload (needs VITE_SUPABASE_ANON_KEY).
+ */
+export async function uploadAlbumPdfForDelivery(albumId, pdfBlob) {
+  if (pdfBlob.size <= PDF_DIRECT_UPLOAD_MAX_BYTES) {
+    const fd = new FormData();
+    fd.append("albumId", albumId);
+    fd.append("pdf", pdfBlob, "album.pdf");
+    const r = await fetch(`${API}/pdf/upload-client-pdf`, { method: "POST", body: fd });
+    if (!r.ok) throw new Error(await r.text());
+    const blob = await r.blob();
+    const pdfUrl = r.headers.get("X-Pdf-Url") || null;
+    return { blob, pdfUrl };
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) {
+    throw new Error(
+      "הקובץ גדול מדי לשליחה לשרת הקצה. הוסף משתנה סביבה VITE_SUPABASE_ANON_KEY (מפתח anon של Supabase) כדי להעלות PDF ישירות לאחסון."
+    );
+  }
+
+  const start = await fetch(`${API}/pdf/signed-upload-start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ albumId, images: imageDataUrls }),
+    body: JSON.stringify({ albumId }),
   });
-  if (!r.ok) throw new Error(await r.text());
-  const blob = await r.blob();
-  const pdfUrl = r.headers.get("X-Pdf-Url") || null;
-  return { blob, pdfUrl };
+  if (!start.ok) throw new Error(await start.text());
+  const { path: storagePath, token } = await start.json();
+
+  const { error: upErr } = await supabase.storage.from("pdfs").uploadToSignedUrl(storagePath, token, pdfBlob, {
+    contentType: "application/pdf",
+    upsert: true,
+  });
+  if (upErr) throw new Error(upErr.message);
+
+  const fin = await fetch(`${API}/pdf/signed-upload-finish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ albumId, path: storagePath }),
+  });
+  if (!fin.ok) throw new Error(await fin.text());
+  const { pdfUrl } = await fin.json();
+  return { blob: pdfBlob, pdfUrl: pdfUrl || null };
 }
 
 export async function getPdfDeliveries() {

@@ -14,7 +14,7 @@ import {
   updatePageConfig,
   getElementsList,
   getElementUrl,
-  generatePdfFromImages,
+  uploadAlbumPdfForDelivery,
 } from "../api";
 import html2canvas from "html2canvas";
 import { toJpeg } from "html-to-image";
@@ -4162,7 +4162,7 @@ export default function EditPages() {
       }
 
       const blob = buildPdfBlobFromJpegDataUrls(images);
-      await generatePdfFromImages(id, images);
+      await uploadAlbumPdfForDelivery(id, blob);
       await saveLocalPdfBlob(id, blob).catch(() => {});
       await stashPdfDataUrlForSession(id, blob);
       const pdfBlobUrl = URL.createObjectURL(blob);

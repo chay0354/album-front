@@ -18,6 +18,7 @@
     "@fontsource/noto-sans-hebrew": "^5.2.8",
     "@fontsource/open-sans": "^5.2.7",
     "@fontsource/rubik": "^5.2.8",
+    "@supabase/supabase-js": "^2.105.1",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
