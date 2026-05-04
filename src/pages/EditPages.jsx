@@ -268,6 +268,55 @@ function resizeLayoutKeepImageAspect(handle, startLayout, pctX, pctY, k, minS, m
   return { x: newX, y: newY, w: newW, h: newH };
 }
 
+/** Resize one dimension only (studio spread edge handles): e/w change width, n/s change height. */
+function resizeLayoutOneAxis(handle, startLayout, pctX, pctY, minS, maxXY) {
+  const l = startLayout;
+  const ar = l.x + l.w;
+  const ab = l.y + l.h;
+  let newX = l.x;
+  let newY = l.y;
+  let newW = l.w;
+  let newH = l.h;
+  switch (handle) {
+    case "e":
+      newW = Math.max(minS, Math.min(maxXY - l.x, pctX - l.x));
+      break;
+    case "w": {
+      const xClamped = Math.max(0, Math.min(ar - minS, pctX));
+      newX = xClamped;
+      newW = ar - xClamped;
+      break;
+    }
+    case "n": {
+      const yClamped = Math.max(0, Math.min(ab - minS, pctY));
+      newY = yClamped;
+      newH = ab - yClamped;
+      break;
+    }
+    case "s":
+      newH = Math.max(minS, Math.min(maxXY - l.y, pctY - l.y));
+      break;
+    default:
+      break;
+  }
+  return { x: newX, y: newY, w: newW, h: newH };
+}
+
+function spreadResizeHandleAriaLabel(h) {
+  switch (h) {
+    case "n":
+      return "שינוי גובה — קצה עליון";
+    case "s":
+      return "שינוי גובה — קצה תחתון";
+    case "e":
+      return "שינוי רוחב — קצה ימני";
+    case "w":
+      return "שינוי רוחב — קצה שמאלי";
+    default:
+      return `שינוי גודל ${h}`;
+  }
+}
+
 const CROP_SLIDER_KEYS = ["l", "t", "w", "h"];
 const CROP_SLIDER_LABELS = { l: "מיקום אופקי", t: "מיקום אנכי", w: "רוחב", h: "גובה" };
 
@@ -2715,6 +2764,47 @@ function nearestSpreadSnapTarget(val, targets, threshold) {
   return best;
 }
 
+/** Snap edge resize (one axis) to template / page guides — same targets as corner resize, no aspect lock. */
+function snapSpreadResizeEdgeToTargets(handle, rect, startLayout, vTargets, hTargets, threshold, minS, maxXY) {
+  const l0 = startLayout;
+  const ar0 = l0.x + l0.w;
+  const ab0 = l0.y + l0.h;
+  const nvR = (val) => nearestSpreadSnapTarget(val, vTargets, threshold);
+  const nhR = (val) => nearestSpreadSnapTarget(val, hTargets, threshold);
+
+  if (handle === "e") {
+    const mx = rect.x + rect.w;
+    const nv = nvR(mx);
+    if (nv == null) return rect;
+    let newW = nv - l0.x;
+    newW = Math.max(minS, Math.min(maxXY - l0.x, newW));
+    return { x: l0.x, y: l0.y, w: newW, h: l0.h };
+  }
+  if (handle === "w") {
+    const mx = rect.x;
+    const nv = nvR(mx);
+    if (nv == null) return rect;
+    const newX = Math.max(0, Math.min(ar0 - minS, nv));
+    return { x: newX, y: l0.y, w: ar0 - newX, h: l0.h };
+  }
+  if (handle === "n") {
+    const my = rect.y;
+    const nh = nhR(my);
+    if (nh == null) return rect;
+    const newY = Math.max(0, Math.min(ab0 - minS, nh));
+    return { x: l0.x, y: newY, w: l0.w, h: ab0 - newY };
+  }
+  if (handle === "s") {
+    const my = rect.y + rect.h;
+    const nh = nhR(my);
+    if (nh == null) return rect;
+    let newH = nh - l0.y;
+    newH = Math.max(minS, Math.min(maxXY - l0.y, newH));
+    return { x: l0.x, y: l0.y, w: l0.w, h: newH };
+  }
+  return rect;
+}
+
 /**
  * After aspect-locked resize, pull the active corner toward template / neighbor guides (same rails as drag).
  */
@@ -2973,30 +3063,44 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
         const { x: pctX, y: pctY } = toPct(getCoords(ev).x, getCoords(ev).y);
         const l = ref.startLayout;
         const k = ref.aspectK;
-        let { x: newX, y: newY, w: newW, h: newH } = resizeLayoutKeepImageAspect(
-          ref.handle,
-          l,
-          pctX,
-          pctY,
-          k,
-          SPREAD_LAYOUT_MIN,
-          SPREAD_LAYOUT_MAX
-        );
+        const edgeHandles = ref.handle === "n" || ref.handle === "s" || ref.handle === "e" || ref.handle === "w";
+        let { x: newX, y: newY, w: newW, h: newH } = edgeHandles
+          ? resizeLayoutOneAxis(ref.handle, l, pctX, pctY, SPREAD_LAYOUT_MIN, SPREAD_LAYOUT_MAX)
+          : resizeLayoutKeepImageAspect(
+              ref.handle,
+              l,
+              pctX,
+              pctY,
+              k,
+              SPREAD_LAYOUT_MIN,
+              SPREAD_LAYOUT_MAX
+            );
         // Keep resize snapping to page/template rails, but don't magnetize to other photos.
         // This allows stretching one photo over another without feeling blocked.
         const { vTargets, hTargets } = buildSpreadSnapTargets(templateSlots, layoutsRef.current, []);
         const resizeTh = templateSlots?.length ? SPREAD_SNAP_RESIZE_THRESHOLD : SPREAD_SNAP_RESIZE_THRESHOLD * 0.85;
-        const snapped = snapSpreadResizeToTargets(
-          ref.handle,
-          { x: newX, y: newY, w: newW, h: newH },
-          l,
-          k,
-          vTargets,
-          hTargets,
-          resizeTh,
-          SPREAD_LAYOUT_MIN,
-          SPREAD_LAYOUT_MAX
-        );
+        const snapped = edgeHandles
+          ? snapSpreadResizeEdgeToTargets(
+              ref.handle,
+              { x: newX, y: newY, w: newW, h: newH },
+              l,
+              vTargets,
+              hTargets,
+              resizeTh,
+              SPREAD_LAYOUT_MIN,
+              SPREAD_LAYOUT_MAX
+            )
+          : snapSpreadResizeToTargets(
+              ref.handle,
+              { x: newX, y: newY, w: newW, h: newH },
+              l,
+              k,
+              vTargets,
+              hTargets,
+              resizeTh,
+              SPREAD_LAYOUT_MIN,
+              SPREAD_LAYOUT_MAX
+            );
         newX = snapped.x;
         newY = snapped.y;
         newW = snapped.w;
@@ -3237,7 +3341,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
             </div>
             {isSelected && (
               <>
-                {["nw", "ne", "sw", "se"].map((h) => (
+                {(["nw", "ne", "sw", "se", "n", "s", "e", "w"]).map((h) => (
                   <div
                     key={h}
                     className={styles.editorResizeHandle}
@@ -3250,7 +3354,7 @@ function StudioSpreadPhotos({ photos, getPhotoUrl, selectedPhotoId, onSelectPhot
                       ev.stopPropagation();
                       handleResizeStart(ev, p.id, h);
                     }}
-                    aria-label={`שינוי גודל ${h}`}
+                    aria-label={spreadResizeHandleAriaLabel(h)}
                   />
                 ))}
               </>
@@ -3340,15 +3444,36 @@ function StudioSpreadStickers({ stickers, getElementUrl, selectedStickerId, onSe
         const { x: pctX, y: pctY } = toPct(getCoords(ev).x, getCoords(ev).y);
         const l = ref.startLayout;
         const k = ref.aspectK;
-        const { x: newX, y: newY, w: newW, h: newH } = resizeLayoutKeepImageAspect(
-          ref.handle,
-          l,
-          pctX,
-          pctY,
-          k,
-          SPREAD_LAYOUT_MIN,
-          SPREAD_LAYOUT_MAX
-        );
+        const edgeHandles = ref.handle === "n" || ref.handle === "s" || ref.handle === "e" || ref.handle === "w";
+        let { x: newX, y: newY, w: newW, h: newH } = edgeHandles
+          ? resizeLayoutOneAxis(ref.handle, l, pctX, pctY, SPREAD_LAYOUT_MIN, SPREAD_LAYOUT_MAX)
+          : resizeLayoutKeepImageAspect(
+              ref.handle,
+              l,
+              pctX,
+              pctY,
+              k,
+              SPREAD_LAYOUT_MIN,
+              SPREAD_LAYOUT_MAX
+            );
+        if (edgeHandles) {
+          const otherIds = sorted.filter((s) => s.id !== ref.stickerId).map((s) => s.id);
+          const { vTargets, hTargets } = buildSpreadSnapTargets(null, layoutsRef.current, otherIds);
+          const snapped = snapSpreadResizeEdgeToTargets(
+            ref.handle,
+            { x: newX, y: newY, w: newW, h: newH },
+            l,
+            vTargets,
+            hTargets,
+            SPREAD_SNAP_RESIZE_THRESHOLD,
+            SPREAD_LAYOUT_MIN,
+            SPREAD_LAYOUT_MAX
+          );
+          newX = snapped.x;
+          newY = snapped.y;
+          newW = snapped.w;
+          newH = snapped.h;
+        }
         setLayouts((prev) => ({
           ...prev,
           [ref.stickerId]: { ...(prev[ref.stickerId] || l), x: newX, y: newY, w: newW, h: newH },
@@ -3373,7 +3498,7 @@ function StudioSpreadStickers({ stickers, getElementUrl, selectedStickerId, onSe
       window.addEventListener("touchmove", onMove, opts);
       window.addEventListener("touchend", onUp);
     },
-    [getCoords, onSelectSticker, onPersistLayout]
+    [getCoords, onSelectSticker, onPersistLayout, sorted]
   );
 
   const handleStickerPointerDown = useCallback(
@@ -3592,7 +3717,7 @@ function StudioSpreadStickers({ stickers, getElementUrl, selectedStickerId, onSe
             </div>
             {isSelected && (
               <>
-                {["nw", "ne", "sw", "se"].map((h) => (
+                {(["nw", "ne", "sw", "se", "n", "s", "e", "w"]).map((h) => (
                   <div
                     key={h}
                     className={styles.editorResizeHandle}
@@ -3605,7 +3730,7 @@ function StudioSpreadStickers({ stickers, getElementUrl, selectedStickerId, onSe
                       ev.stopPropagation();
                       handleResizeStart(ev, s.id, h);
                     }}
-                    aria-label={`שינוי גודל ${h}`}
+                    aria-label={spreadResizeHandleAriaLabel(h)}
                   />
                 ))}
               </>

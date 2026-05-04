@@ -1,12 +1,15 @@
 import { jsPDF } from "jspdf";
+import { albumPageWidthPt, albumPageHeightPt } from "../../shared/albumPageSize.js";
 
 /** Pure image PDF in the browser — no server text/fonts; each page is a full-page JPEG. */
 export function buildPdfBlobFromJpegDataUrls(jpegDataUrls) {
   if (!jpegDataUrls?.length) throw new Error("אין עמודים ל-PDF");
+  const wPt = albumPageWidthPt();
+  const hPt = albumPageHeightPt();
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "pt",
-    format: "a4",
+    format: [wPt, hPt],
     compress: true,
   });
   const w = pdf.internal.pageSize.getWidth();

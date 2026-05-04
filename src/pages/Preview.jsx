@@ -6,6 +6,7 @@ import { getFontStack } from "../constants/fonts";
 import StageIndicator from "../components/StageIndicator";
 import AlbumLoading from "../components/AlbumLoading";
 import { getMyglobyCheckoutUrl } from "../myglobyCheckout";
+import { albumPageHeightOverWidth } from "../../../shared/albumPageSize.js";
 import styles from "./Preview.module.css";
 
 const DEFAULT_LAYOUT = (index) => {
@@ -15,9 +16,10 @@ const DEFAULT_LAYOUT = (index) => {
 };
 
 export const BOOK_WIDTH_MOBILE = 340;
-export const BOOK_HEIGHT_MOBILE = 481; /* A4: 340 * (297/210) */
+export const BOOK_HEIGHT_MOBILE = Math.round(BOOK_WIDTH_MOBILE * albumPageHeightOverWidth());
 export const BOOK_WIDTH_DESKTOP = 680;
-export const BOOK_HEIGHT_DESKTOP = 481; /* A4 per half: (680/2) * (297/210) */
+/** One half of spread width → height matches album trim (see shared/albumPageSize.js). */
+export const BOOK_HEIGHT_DESKTOP = Math.round((BOOK_WIDTH_DESKTOP / 2) * albumPageHeightOverWidth());
 const EDITOR_PAGE_WIDTH = 420;
 const VIEWER_HALF_WIDTH = BOOK_WIDTH_DESKTOP / 2;
 const VIEWER_TEXT_SCALE = VIEWER_HALF_WIDTH / EDITOR_PAGE_WIDTH;

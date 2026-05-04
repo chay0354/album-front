@@ -1276,6 +1276,34 @@
   cursor: nwse-resize;
 }
 
+.editorResizeHandle[data-handle="n"] {
+  top: 0;
+  left: calc(50% - 8px);
+  margin-top: -8px;
+  cursor: ns-resize;
+}
+
+.editorResizeHandle[data-handle="s"] {
+  bottom: 0;
+  left: calc(50% - 8px);
+  margin-bottom: -8px;
+  cursor: ns-resize;
+}
+
+.editorResizeHandle[data-handle="e"] {
+  top: calc(50% - 8px);
+  right: 0;
+  margin-right: -8px;
+  cursor: ew-resize;
+}
+
+.editorResizeHandle[data-handle="w"] {
+  top: calc(50% - 8px);
+  left: 0;
+  margin-left: -8px;
+  cursor: ew-resize;
+}
+
 .editorPhotoControls {
   position: absolute;
   top: 100%;
