@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import { albumPageWidthPt, albumPageHeightPt } from "../../shared/albumPageSize.js";
+import { albumPageWidthPt, albumPageHeightPt } from "./albumPageSize.js";
 
 /** Pure image PDF in the browser — no server text/fonts; each page is a full-page JPEG. */
 export function buildPdfBlobFromJpegDataUrls(jpegDataUrls) {
