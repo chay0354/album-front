@@ -3550,7 +3550,12 @@
 :global(body.pdfCaptureMode) .studioPhotoSelectionBar,
 :global(body.pdfCaptureMode) .studioBottomDock,
 :global(body.pdfCaptureMode) .tapAddPhoto,
-:global(body.pdfCaptureMode) .tapAddPhotoCorner {
+:global(body.pdfCaptureMode) .tapAddPhotoCorner,
+:global(body.pdfCaptureMode) .studioTemplateSlotsLayer,
+:global(body.pdfCaptureMode) .studioSlotHit,
+:global(body.pdfCaptureMode) .studioSlotPlus,
+:global(body.pdfCaptureMode) .templateSlotPlaceholder,
+:global(body.pdfCaptureMode) .templateSlotPlus {
   visibility: hidden !important;
   pointer-events: none !important;
 }
