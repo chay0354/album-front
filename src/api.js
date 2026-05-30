@@ -1,5 +1,3 @@
-import { getSupabaseBrowserClient } from "./supabaseClient.js";
-
 // In dev use proxy (/api). In production set VITE_API_URL to your backend origin (e.g. https://album-back.vercel.app)
 const API_BASE = import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace(/\/$/, "") : "";
 const API = API_BASE ? API_BASE + "/api" : "/api";
@@ -297,7 +295,8 @@ export function getPdfDownloadUrl(albumId) {
 
 /**
  * Register client-built PDF (same pixels as local jsPDF) for delivery / analytics.
- * Small files: multipart to API. Large: Supabase signed upload (needs VITE_SUPABASE_ANON_KEY).
+ * Small files: multipart to API. Large: PUT straight to a Supabase signed URL minted by the API
+ * (no anon key needed in the browser — the token in the URL authorizes the single upload).
  */
 export async function uploadAlbumPdfForDelivery(albumId, pdfBlob) {
   if (pdfBlob.size <= PDF_DIRECT_UPLOAD_MAX_BYTES) {
@@ -311,26 +310,27 @@ export async function uploadAlbumPdfForDelivery(albumId, pdfBlob) {
     return { blob, pdfUrl };
   }
 
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) {
-    throw new Error(
-      "הקובץ גדול מדי לשליחה לשרת הקצה. הוסף משתנה סביבה VITE_SUPABASE_ANON_KEY (מפתח anon של Supabase) כדי להעלות PDF ישירות לאחסון."
-    );
-  }
-
   const start = await fetch(`${API}/pdf/signed-upload-start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ albumId }),
   });
   if (!start.ok) throw new Error(await start.text());
-  const { path: storagePath, token } = await start.json();
+  const { path: storagePath, signedUrl } = await start.json();
+  if (!signedUrl) throw new Error("לא התקבלה כתובת העלאה מאובטחת מהשרת");
 
-  const { error: upErr } = await supabase.storage.from("pdfs").uploadToSignedUrl(storagePath, token, pdfBlob, {
-    contentType: "application/pdf",
-    upsert: true,
+  const uploadBody = new FormData();
+  uploadBody.append("cacheControl", "3600");
+  uploadBody.append("", pdfBlob, "album.pdf");
+  const up = await fetch(signedUrl, {
+    method: "PUT",
+    headers: { "x-upsert": "true" },
+    body: uploadBody,
   });
-  if (upErr) throw new Error(upErr.message);
+  if (!up.ok) {
+    const detail = await up.text().catch(() => "");
+    throw new Error(`העלאת ה-PDF לאחסון נכשלה (${up.status}) ${detail}`.trim());
+  }
 
   const fin = await fetch(`${API}/pdf/signed-upload-finish`, {
     method: "POST",
