@@ -5,26 +5,42 @@ const API = API_BASE ? API_BASE + "/api" : "/api";
 /** Stay under Vercel ~4.5 MB request cap for multipart PDF upload; larger → Supabase signed upload. */
 const PDF_DIRECT_UPLOAD_MAX_BYTES = 4_000_000;
 
-/** Vercel serverless has 4.5 MB request body limit. Compress so single or multiple photos fit. */
-const MAX_FILE_SIZE = 1.4 * 1024 * 1024; // 1.4 MB per file so 3 photos stay under 4.5 MB
-const MAX_DIMENSION = 1600;
-const JPEG_QUALITY = 0.82;
+/**
+ * Each photo uploads in its own request (see uploadPhotos), so a single high-res image just needs to
+ * fit Vercel's ~4.5 MB body cap — not be shared across 3 photos. Higher dimension/quality = sharper print PDF.
+ */
+const MAX_FILE_SIZE = 3.8 * 1024 * 1024; // keep one upload request under Vercel's 4.5 MB limit
+const MAX_DIMENSION = 2600; // ~A4 300 DPI long edge, so full-page photos stay crisp in the PDF
+const JPEG_QUALITY = 0.92;
+
+async function encodeWithinSizeLimit(canvas, originalFile) {
+  // Step quality down only if needed to stay under MAX_FILE_SIZE; keeps the best quality that fits.
+  const qualities = [JPEG_QUALITY, 0.88, 0.84, 0.8, 0.74];
+  for (const q of qualities) {
+    const blob = await new Promise((res) => canvas.toBlob(res, "image/jpeg", q));
+    if (blob && (blob.size <= MAX_FILE_SIZE || q === qualities[qualities.length - 1])) {
+      return new File([blob], originalFile.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+    }
+  }
+  return originalFile;
+}
 
 async function compressImageForUpload(file) {
-  if (!file.type.startsWith("image/") || file.size <= MAX_FILE_SIZE) return file;
+  if (!file.type.startsWith("image/")) return file;
   return new Promise((resolve) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => {
+    img.onload = async () => {
       URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width <= MAX_DIMENSION && height <= MAX_DIMENSION && file.size <= MAX_FILE_SIZE) {
+      const { width: ow, height: oh } = img;
+      const withinDim = ow <= MAX_DIMENSION && oh <= MAX_DIMENSION;
+      if (withinDim && file.size <= MAX_FILE_SIZE) {
         resolve(file);
         return;
       }
-      const scale = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height, 1);
-      width = Math.round(width * scale);
-      height = Math.round(height * scale);
+      const scale = Math.min(MAX_DIMENSION / ow, MAX_DIMENSION / oh, 1);
+      const width = Math.round(ow * scale);
+      const height = Math.round(oh * scale);
       const canvas = document.createElement("canvas");
       canvas.width = width;
       canvas.height = height;
@@ -33,18 +49,11 @@ async function compressImageForUpload(file) {
         resolve(file);
         return;
       }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0, width, height);
-      canvas.toBlob(
-        (blob) => {
-          if (!blob || blob.size >= file.size) {
-            resolve(file);
-            return;
-          }
-          resolve(new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" }));
-        },
-        "image/jpeg",
-        JPEG_QUALITY
-      );
+      const out = await encodeWithinSizeLimit(canvas, file);
+      resolve(out.size < file.size || !withinDim ? out : file);
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -173,11 +182,18 @@ export async function updatePageConfig(albumId, pageId, pageConfig) {
 
 export async function uploadPhotos(albumId, pageId, files) {
   const compressed = await Promise.all(Array.from(files).map((f) => compressImageForUpload(f)));
-  const fd = new FormData();
-  for (const f of compressed) fd.append("photos", f);
-  const r = await fetch(`${API}/albums/${albumId}/pages/${pageId}/upload`, { method: "POST", body: fd });
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+  // One request per photo: each high-res image stays under Vercel's ~4.5 MB body cap.
+  const inserted = [];
+  for (const f of compressed) {
+    const fd = new FormData();
+    fd.append("photos", f);
+    const r = await fetch(`${API}/albums/${albumId}/pages/${pageId}/upload`, { method: "POST", body: fd });
+    if (!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+    if (Array.isArray(rows)) inserted.push(...rows);
+    else if (rows) inserted.push(rows);
+  }
+  return inserted;
 }
 
 export async function addPhotoToPage(albumId, pageId, storagePath, photoOrder) {
