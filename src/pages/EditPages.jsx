@@ -17,8 +17,8 @@ import {
   uploadAlbumPdfForDelivery,
 } from "../api";
 import html2canvas from "html2canvas";
-import { toPng } from "html-to-image";
-import { domToPng } from "modern-screenshot";
+import { toCanvas as htiToCanvas } from "html-to-image";
+import { domToCanvas } from "modern-screenshot";
 import { buildPdfBlobFromJpegDataUrls } from "../pdfClient";
 import { saveLocalPdfBlob } from "../pdfLocalCache";
 import { stashPdfDataUrlForSession, stashPdfBlobUrlForSession } from "../pdfSessionBridge";
@@ -522,40 +522,68 @@ function setMinimalDragImage(e) {
 /** Raster page size before embedding in A4 PDF. A4 at 300 DPI = 2480×3508 (HD print). */
 const PDF_OUT_W_DESKTOP = 2480;
 const PDF_OUT_H_DESKTOP = 3508;
-/* Mobile now renders full A4 300 DPI too (was 1587×2245); maxPr is capped to keep iOS canvas memory safe. */
+/* Mobile renders full A4 300 DPI too; maxPr + maxCapturePx keep iOS/Android canvas memory safe. */
 const PDF_OUT_W_MOBILE = 2480;
 const PDF_OUT_H_MOBILE = 3508;
 const PDF_CAPTURE_TARGET_W_DESKTOP = 3200;
 const PDF_CAPTURE_TARGET_W_MOBILE = 2480;
 const PDF_CAPTURE_MAX_PR_DESKTOP = 8;
-const PDF_CAPTURE_MAX_PR_MOBILE = 6;
+/* High cap; the per-canvas pixel limit (PDF_CAPTURE_MAX_PX_MOBILE) is what actually protects iOS memory. */
+const PDF_CAPTURE_MAX_PR_MOBILE = 8;
 const PDF_JPEG_QUALITY_DESKTOP = 0.98;
-const PDF_JPEG_QUALITY_MOBILE = 0.94;
+const PDF_JPEG_QUALITY_MOBILE = 0.95;
+/**
+ * Max pixels for the intermediate capture canvas.
+ * iOS Safari hard-caps a canvas at 16,777,216 px and gets unstable near it — stay well under on mobile.
+ */
+const PDF_CAPTURE_MAX_PX_DESKTOP = 40_000_000;
+const PDF_CAPTURE_MAX_PX_MOBILE = 12_000_000;
+
+function isIOSDevice() {
+  if (typeof navigator === "undefined") return false;
+  const ua = String(navigator.userAgent || "");
+  return /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && (navigator.maxTouchPoints || 0) > 1);
+}
 
 function isMobileUserAgent() {
   if (typeof navigator === "undefined") return false;
   const ua = String(navigator.userAgent || "");
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes("Mac") && (navigator.maxTouchPoints || 0) > 1);
-  return isIOS || /Android|Mobile|IEMobile|Opera Mini/i.test(ua);
+  return isIOSDevice() || /Android|Mobile|IEMobile|Opera Mini/i.test(ua);
 }
 
 function getPdfCaptureSettings() {
   const mobile = isMobileUserAgent();
   return mobile
     ? {
+        mobile: true,
         outW: PDF_OUT_W_MOBILE,
         outH: PDF_OUT_H_MOBILE,
         targetW: PDF_CAPTURE_TARGET_W_MOBILE,
         maxPr: PDF_CAPTURE_MAX_PR_MOBILE,
+        maxCapturePx: PDF_CAPTURE_MAX_PX_MOBILE,
         quality: PDF_JPEG_QUALITY_MOBILE,
       }
     : {
+        mobile: false,
         outW: PDF_OUT_W_DESKTOP,
         outH: PDF_OUT_H_DESKTOP,
         targetW: PDF_CAPTURE_TARGET_W_DESKTOP,
         maxPr: PDF_CAPTURE_MAX_PR_DESKTOP,
+        maxCapturePx: PDF_CAPTURE_MAX_PX_DESKTOP,
         quality: PDF_JPEG_QUALITY_DESKTOP,
       };
+}
+
+/** Largest device-pixel-ratio whose capture canvas stays under the platform pixel cap. */
+function clampCapturePixelRatio(el, cfg) {
+  const w = Math.max(1, el.offsetWidth);
+  const h = Math.max(1, el.offsetHeight);
+  let pr = Math.min(cfg.maxPr, Math.max(2, Math.ceil(cfg.targetW / w)));
+  const prByArea = Math.sqrt(cfg.maxCapturePx / (w * h));
+  if (Number.isFinite(prByArea) && prByArea >= 1) {
+    pr = Math.min(pr, prByArea);
+  }
+  return Math.max(1, pr);
 }
 
 const COVER_FRONT_START = 0;
@@ -586,18 +614,10 @@ function toCoverPaneX(storedX, side) {
   return Math.max(0, Math.min(100, x));
 }
 
-function loadRasterImage(dataUrl) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
-  });
-}
-
 /**
  * Raster snapshot of the visible page (pixels only — no PDF font encoding).
- * Captures losslessly (PNG) first so the only lossy step is a single high-quality JPEG encode at the end.
+ * Captures straight to a canvas (no giant base64 PNG string → safe iOS/Android memory) and the only
+ * lossy step is a single high-quality JPEG encode at the end.
  * Order: modern-screenshot → html-to-image → html2canvas.
  */
 async function captureVisibleElementToPdfJpeg(el) {
@@ -608,29 +628,24 @@ async function captureVisibleElementToPdfJpeg(el) {
   await new Promise((r) => requestAnimationFrame(r));
 
   const cfg = getPdfCaptureSettings();
-  const pr = Math.min(
-    cfg.maxPr,
-    Math.max(2, Math.ceil(cfg.targetW / Math.max(1, el.offsetWidth)))
-  );
+  const pr = clampCapturePixelRatio(el, cfg);
 
-  let source = null; // HTMLImageElement (from PNG) or HTMLCanvasElement
+  let source = null; // HTMLCanvasElement
   try {
-    const pngUrl = await domToPng(el, {
+    source = await domToCanvas(el, {
       scale: pr,
       fetch: { bypassingCache: true },
       drawImageInterval: 150,
       timeout: 60000,
     });
-    source = await loadRasterImage(pngUrl);
   } catch (e1) {
-    console.warn("[PDF] domToPng failed:", e1?.message || e1);
+    console.warn("[PDF] domToCanvas failed:", e1?.message || e1);
   }
   if (!source) {
     try {
-      const pngUrl = await toPng(el, { pixelRatio: pr, cacheBust: true, skipFonts: false });
-      source = await loadRasterImage(pngUrl);
+      source = await htiToCanvas(el, { pixelRatio: pr, cacheBust: true, skipFonts: false });
     } catch (e2) {
-      console.warn("[PDF] toPng failed:", e2?.message || e2);
+      console.warn("[PDF] html-to-image toCanvas failed:", e2?.message || e2);
     }
   }
   if (!source) {
@@ -657,9 +672,9 @@ async function captureVisibleElementToPdfJpeg(el) {
   if (!ctx) throw new Error("PDF capture: no canvas context");
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, cfg.outW, cfg.outH);
-  const nw = source ? source.naturalWidth || source.width : 0;
-  const nh = source ? source.naturalHeight || source.height : 0;
-  /* Blank / empty regions may decode to 0×0 — still emit a white PDF page so page count matches. */
+  const nw = source ? source.width : 0;
+  const nh = source ? source.height : 0;
+  /* Blank / empty regions may capture to 0×0 — still emit a white PDF page so page count matches. */
   if (!source || nw < 1 || nh < 1) return out.toDataURL("image/jpeg", cfg.quality);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
@@ -669,6 +684,9 @@ async function captureVisibleElementToPdfJpeg(el) {
   const dx = (cfg.outW - dw) / 2;
   const dy = (cfg.outH - dh) / 2;
   ctx.drawImage(source, 0, 0, nw, nh, dx, dy, dw, dh);
+  /* Free the (large) capture canvas before the next page so mobile reclaims memory. */
+  source.width = 0;
+  source.height = 0;
   return out.toDataURL("image/jpeg", cfg.quality);
 }
 
