@@ -6,6 +6,31 @@ const API = API_BASE ? API_BASE + "/api" : "/api";
 const PDF_DIRECT_UPLOAD_MAX_BYTES = 4_000_000;
 
 /**
+ * fetch with timeout + retries. iOS Safari surfaces flaky networks as "Load failed" (a TypeError),
+ * so we retry transient network/timeouts. HTTP error responses are returned as-is (caller decides).
+ */
+async function fetchWithRetry(url, options = {}, { retries = 2, timeoutMs = 45000 } = {}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
+      return res;
+    } catch (err) {
+      clearTimeout(timer);
+      lastErr = err;
+      if (attempt < retries) {
+        await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+        continue;
+      }
+    }
+  }
+  throw lastErr || new Error("Network request failed");
+}
+
+/**
  * Each photo uploads in its own request (see uploadPhotos), so a single high-res image just needs to
  * fit Vercel's ~4.5 MB body cap — not be shared across 3 photos. Higher dimension/quality = sharper print PDF.
  */
@@ -187,7 +212,11 @@ export async function uploadPhotos(albumId, pageId, files) {
   for (const f of compressed) {
     const fd = new FormData();
     fd.append("photos", f);
-    const r = await fetch(`${API}/albums/${albumId}/pages/${pageId}/upload`, { method: "POST", body: fd });
+    const r = await fetchWithRetry(
+      `${API}/albums/${albumId}/pages/${pageId}/upload`,
+      { method: "POST", body: fd },
+      { retries: 1, timeoutMs: 60000 }
+    );
     if (!r.ok) throw new Error(await r.text());
     const rows = await r.json();
     if (Array.isArray(rows)) inserted.push(...rows);
@@ -319,14 +348,14 @@ export async function uploadAlbumPdfForDelivery(albumId, pdfBlob) {
     const fd = new FormData();
     fd.append("albumId", albumId);
     fd.append("pdf", pdfBlob, "album.pdf");
-    const r = await fetch(`${API}/pdf/upload-client-pdf`, { method: "POST", body: fd });
+    const r = await fetchWithRetry(`${API}/pdf/upload-client-pdf`, { method: "POST", body: fd }, { timeoutMs: 60000 });
     if (!r.ok) throw new Error(await r.text());
     const blob = await r.blob();
     const pdfUrl = r.headers.get("X-Pdf-Url") || null;
     return { blob, pdfUrl };
   }
 
-  const start = await fetch(`${API}/pdf/signed-upload-start`, {
+  const start = await fetchWithRetry(`${API}/pdf/signed-upload-start`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ albumId }),
@@ -338,17 +367,17 @@ export async function uploadAlbumPdfForDelivery(albumId, pdfBlob) {
   const uploadBody = new FormData();
   uploadBody.append("cacheControl", "3600");
   uploadBody.append("", pdfBlob, "album.pdf");
-  const up = await fetch(signedUrl, {
-    method: "PUT",
-    headers: { "x-upsert": "true" },
-    body: uploadBody,
-  });
+  const up = await fetchWithRetry(
+    signedUrl,
+    { method: "PUT", headers: { "x-upsert": "true" }, body: uploadBody },
+    { timeoutMs: 120000 }
+  );
   if (!up.ok) {
     const detail = await up.text().catch(() => "");
     throw new Error(`העלאת ה-PDF לאחסון נכשלה (${up.status}) ${detail}`.trim());
   }
 
-  const fin = await fetch(`${API}/pdf/signed-upload-finish`, {
+  const fin = await fetchWithRetry(`${API}/pdf/signed-upload-finish`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ albumId, path: storagePath }),

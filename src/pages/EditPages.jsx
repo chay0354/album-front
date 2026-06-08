@@ -679,7 +679,12 @@ async function captureVisibleElementToPdfJpeg(el) {
   const nw = source ? source.width : 0;
   const nh = source ? source.height : 0;
   /* Blank / empty regions may capture to 0×0 — still emit a white PDF page so page count matches. */
-  if (!source || nw < 1 || nh < 1) return out.toDataURL("image/jpeg", cfg.quality);
+  if (!source || nw < 1 || nh < 1) {
+    const blank = out.toDataURL("image/jpeg", cfg.quality);
+    out.width = 0;
+    out.height = 0;
+    return blank;
+  }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   const scale = Math.min(cfg.outW / nw, cfg.outH / nh);
@@ -688,10 +693,14 @@ async function captureVisibleElementToPdfJpeg(el) {
   const dx = (cfg.outW - dw) / 2;
   const dy = (cfg.outH - dh) / 2;
   ctx.drawImage(source, 0, 0, nw, nh, dx, dy, dw, dh);
-  /* Free the (large) capture canvas before the next page so mobile reclaims memory. */
+  /* Free the (large) capture canvas before encoding so mobile only holds one big canvas at a time. */
   source.width = 0;
   source.height = 0;
-  return out.toDataURL("image/jpeg", cfg.quality);
+  const dataUrl = out.toDataURL("image/jpeg", cfg.quality);
+  /* Free the output canvas too so memory doesn't accumulate across many pages on iOS. */
+  out.width = 0;
+  out.height = 0;
+  return dataUrl;
 }
 
 /** Mini preview in “כל העמודים” sheet — single spread half-page. */
@@ -4190,12 +4199,19 @@ export default function EditPages() {
       }
 
       const blob = buildPdfBlobFromJpegDataUrls(images);
-      await uploadAlbumPdfForDelivery(id, blob);
+      // Persist the user's PDF FIRST so a flaky network on the delivery upload (iOS "Load failed")
+      // never costs them the album they just generated.
       await saveLocalPdfBlob(id, blob).catch(() => {});
       await stashPdfDataUrlForSession(id, blob);
       const pdfBlobUrl = URL.createObjectURL(blob);
       stashPdfHandoff(id, pdfBlobUrl);
       stashPdfBlobUrlForSession(id, pdfBlobUrl);
+      // Delivery upload (server record for fulfillment) is best-effort: retried internally, never fatal.
+      try {
+        await uploadAlbumPdfForDelivery(id, blob);
+      } catch (uploadErr) {
+        console.warn("[PDF] delivery upload failed (local copy kept):", uploadErr?.message || uploadErr);
+      }
       try {
         sessionStorage.removeItem("albumCheckoutTabForPdf");
       } catch (_) {
