@@ -526,10 +526,14 @@ const PDF_OUT_H_DESKTOP = 3508;
 const PDF_OUT_W_MOBILE = 2480;
 const PDF_OUT_H_MOBILE = 3508;
 const PDF_CAPTURE_TARGET_W_DESKTOP = 3200;
-const PDF_CAPTURE_TARGET_W_MOBILE = 2480;
-const PDF_CAPTURE_MAX_PR_DESKTOP = 8;
-/* High cap; the per-canvas pixel limit (PDF_CAPTURE_MAX_PX_MOBILE) is what actually protects iOS memory. */
-const PDF_CAPTURE_MAX_PR_MOBILE = 8;
+const PDF_CAPTURE_TARGET_W_MOBILE = 2600;
+/**
+ * The on-screen page can be small (a studio half-page is only ~180px wide on a phone), so a low maxPr
+ * would capture far below the 2480px A4 output and then upscale (blurry). Keep maxPr high enough to reach
+ * full output resolution; the per-canvas pixel cap (PDF_CAPTURE_MAX_PX_*) is the real memory guard.
+ */
+const PDF_CAPTURE_MAX_PR_DESKTOP = 16;
+const PDF_CAPTURE_MAX_PR_MOBILE = 18;
 const PDF_JPEG_QUALITY_DESKTOP = 0.98;
 const PDF_JPEG_QUALITY_MOBILE = 0.95;
 /**
